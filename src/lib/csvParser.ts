@@ -22,7 +22,9 @@ function normaliseRow(raw: Record<string, string>): CsvRow | null {
 }
 
 export function parseCsv(csvText: string): { data: ParsedData; error?: string } {
-  const parsed = Papa.parse<Record<string, string>>(csvText, { header: true, skipEmptyLines: true })
+  const firstLineEnd = csvText.indexOf('\n')
+  const textWithoutRow1 = firstLineEnd === -1 ? '' : csvText.slice(firstLineEnd + 1)
+  const parsed = Papa.parse<Record<string, string>>(textWithoutRow1, { header: true, skipEmptyLines: true })
   if (parsed.errors.length > 0) {
     const first = parsed.errors[0]
     return { data: { clubs: [], teamsByClub: {}, playersByClub: {} }, error: first?.message ?? 'Parse error' }

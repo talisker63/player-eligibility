@@ -1,73 +1,104 @@
-# React + TypeScript + Vite
+# Player Eligibility
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A web application for checking Bowls Victoria player eligibility based on match data. Users upload a CSV export from the Bowls Victoria results portal, then query eligible players for a given club and team using defined rules (minimum 4 club games, no 51%+ of games in a higher team).
 
-Currently, two official plugins are available:
+## Features
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+- Firebase Authentication (email/password and Google OAuth)
+- CSV upload and storage via Firebase Storage
+- Parse Bowls Victoria match data format
+- Filter eligible players by club, team, and eligibility rules
+- Password reset and show/hide password on login
+- Help modal accessible via header icon
 
-## React Compiler
+## Tech Stack
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+- React 19 + TypeScript
+- Vite 7
+- Tailwind CSS 4
+- Firebase (Auth, Storage)
+- PapaParse (CSV parsing)
+- React Router 7
 
-## Expanding the ESLint configuration
+## Prerequisites
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+- Node.js 18+
+- Firebase project with Auth and Storage enabled
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+## Setup
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+1. Clone the repository and install dependencies:
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+npm install
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+2. Configure Firebase: create `.env` in the project root with:
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
 ```
+VITE_FIREBASE_API_KEY=...
+VITE_FIREBASE_AUTH_DOMAIN=...
+VITE_FIREBASE_PROJECT_ID=...
+VITE_FIREBASE_STORAGE_BUCKET=...
+VITE_FIREBASE_MESSAGING_SENDER_ID=...
+VITE_FIREBASE_APP_ID=...
+```
+
+3. Run the dev server:
+
+```bash
+npm run dev
+```
+
+4. Build for production:
+
+```bash
+npm run build
+```
+
+## Scripts
+
+| Command   | Description              |
+| --------- | ------------------------ |
+| `npm run dev`    | Start Vite dev server     |
+| `npm run build`  | Build for production      |
+| `npm run preview`| Preview production build  |
+| `npm run lint`   | Run ESLint                |
+
+## Project Structure
+
+```
+src/
+├── components/     # ProtectedRoute, HelpModal
+├── lib/            # firebase, storage, csvParser, eligibility
+├── pages/          # Home, Eligibility, ForgotPassword
+├── types/          # TypeScript types
+└── App.tsx
+```
+
+## Documentation
+
+- [Architecture](docs/ARCHITECTURE.md) – Technical design and data flow
+- [User Guide](docs/USER_GUIDE.md) – How to use the application
+
+## CSV Format
+
+The app expects a CSV with these columns (from Bowls Victoria results portal):
+
+- Surname
+- Name
+- Nominated Club
+- Team
+- Total Matches Played
+
+## Deployment
+
+The app is configured for Firebase Hosting. Deploy with:
+
+```bash
+firebase deploy
+```
+
+## Copyright
+
+© This tool is copyright to Andrew Sleight 2026
