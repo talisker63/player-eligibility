@@ -18,6 +18,12 @@
 3. The file is uploaded to storage and the app loads clubs and teams from it.
 4. You can replace the file at any time by uploading a new CSV.
 
+## How the data is analysed
+
+- The CSV must include: **Surname**, **Name**, **Nominated Club**, **Team**, and **Total Rounds Played**. Optional columns (e.g. round-by-round data in columns F–R) can also be present.
+- Each row is aggregated by player (surname + name), club, and team. Multiple rows for the same player at the same club and team are summed.
+- **Finals exclusion**: If the spreadsheet has columns F–R (6th–18th columns), any cell containing **(f)** is treated as a finals round. For each occurrence of **(f)** in those columns, 1 is subtracted from that row’s contribution to the total rounds. Finals rounds are not counted toward eligibility.
+
 ## Checking Eligibility
 
 1. Choose a **Nominated club** from the dropdown.
@@ -25,6 +31,11 @@
 3. Choose which **Rules** to apply (see Eligibility Rules below).
 4. Click **Check eligibility**.
 5. The list of eligible players appears below, with their total club games shown. Game counts are colour-coded: **red** indicates the player has played more games in higher sides than lower; **green** indicates more games in lower sides; grey indicates an equal split.
+
+## Viewing player details
+
+- Click a player’s **name** in the eligible list to see how many games that player has played in each division/grade (team) for the nominated club.
+- Click the **X** button to close the details view and return to the full list.
 
 ## Eligibility Rules
 
