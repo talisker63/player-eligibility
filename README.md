@@ -1,15 +1,16 @@
 # Player Eligibility
 
-A web application for checking Bowls Victoria player eligibility based on match data. Users upload a CSV export from the Bowls Victoria results portal, then query eligible players for a given club and team using defined rules (minimum 4 club games, no 51%+ of games in a higher team).
+A web application for checking Bowls Victoria player eligibility based on rounds data. Users upload a CSV export from the Bowls Victoria results portal, then query eligible players for a given club and team using defined rules (minimum 4 club games, no 51%+ of games in a higher team).
 
 ## Features
 
 - Firebase Authentication (email/password and Google OAuth)
 - CSV upload and storage via Firebase Storage
-- Parse Bowls Victoria match data format
+- Parse Bowls Victoria rounds data format
 - Filter eligible players by club, team, and eligibility rules
 - Password reset and show/hide password on login
 - Help modal accessible via header icon
+- Feedback form sending emails via Resend (andrew@asleight.com → asleighty@gmail.com)
 
 ## Tech Stack
 
@@ -23,7 +24,7 @@ A web application for checking Bowls Victoria player eligibility based on match 
 ## Prerequisites
 
 - Node.js 18+
-- Firebase project with Auth and Storage enabled
+- Firebase project with Auth, Storage, and Functions enabled
 
 ## Setup
 
@@ -55,6 +56,16 @@ npm run dev
 ```bash
 npm run build
 ```
+
+5. Deploy functions and set the Resend API key (for feedback emails):
+
+```bash
+cd functions
+npm run deploy
+firebase functions:secrets:set RESEND_API_KEY
+```
+
+Ensure the sender domain (andrew@asleight.com) is verified in the [Resend dashboard](https://resend.com/domains).
 
 ## Scripts
 
@@ -89,7 +100,7 @@ The app expects a CSV with these columns (from Bowls Victoria results portal):
 - Name
 - Nominated Club
 - Team
-- Total Matches Played
+- Total Rounds Played
 
 ## Deployment
 

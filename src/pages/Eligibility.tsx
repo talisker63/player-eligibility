@@ -1,10 +1,11 @@
 import { signOut } from 'firebase/auth'
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { auth } from '../lib/firebase'
+import { auth, functions, httpsCallable } from '../lib/firebase'
 import { downloadCsvFromStorage, uploadCsvToStorage } from '../lib/storage'
 import { parseCsv } from '../lib/csvParser'
-import { getEligiblePlayers, type RuleSelection } from '../lib/eligibility'
+import { getEligiblePlayers, getGamesBias, type RuleSelection } from '../lib/eligibility'
+import FeedbackModal from '../components/FeedbackModal'
 import HelpModal from '../components/HelpModal'
 import type { EligiblePlayer, ParsedData, TeamGrade } from '../types/eligibility'
 
@@ -24,6 +25,7 @@ export default function Eligibility() {
   const [ruleSelection, setRuleSelection] = useState<RuleSelection>('both')
   const [sortBy, setSortBy] = useState<'name-asc' | 'name-desc' | 'games-asc' | 'games-desc'>('name-asc')
   const [helpOpen, setHelpOpen] = useState(false)
+  const [feedbackOpen, setFeedbackOpen] = useState(false)
 
   const loadFromStorage = useCallback(async () => {
     setLoadLoading(true)
@@ -121,7 +123,10 @@ export default function Eligibility() {
   return (
     <div className="min-h-screen bg-slate-900 text-white">
       <header className="border-b border-slate-700 px-4 py-3 flex items-center justify-between">
-        <h1 className="text-xl font-bold">Player Eligibility</h1>
+        <div>
+          <h1 className="text-xl font-bold">Player Eligibility</h1>
+          <p className="text-sm text-slate-400">Last three games or finals.</p>
+        </div>
         <div className="flex items-center gap-2">
           <button
             type="button"
@@ -153,9 +158,9 @@ export default function Eligibility() {
         )}
 
         <section className="bg-slate-800 rounded-xl p-4">
-          <h2 className="text-lg font-semibold mb-3">Matches CSV</h2>
+          <h2 className="text-lg font-semibold mb-3">Rounds CSV</h2>
           <p className="text-slate-400 text-sm mb-3">
-            Download the file &quot;Number of matches played per member, per competition * (download CSV file)&quot; from the{' '}
+            Download the file &quot;Rounds played per member, per competition * (download CSV file)&quot; from the{' '}
             <a
               href="https://results.bowlslink.com.au/event/888793b6-ee24-48f8-9eac-3895cea9f7f8"
               target="_blank"
@@ -274,15 +279,24 @@ export default function Eligibility() {
                   </p>
                 ) : (
                   <ul className="space-y-2 max-h-96 overflow-y-auto">
-                    {sortedEligible.map((p) => (
-                      <li
-                        key={`${p.surname}-${p.name}`}
-                        className="flex justify-between items-baseline py-2 border-b border-slate-700 last:border-0"
-                      >
-                        <span className="font-medium">{p.name} {p.surname}</span>
-                        <span className="text-slate-400 text-sm">{p.totalClubMatches} games</span>
-                      </li>
-                    ))}
+                    {sortedEligible.map((p) => {
+                      const bias = getGamesBias(p, team)
+                      const gamesColorClass =
+                        bias === 'higher'
+                          ? 'text-red-400'
+                          : bias === 'lower'
+                            ? 'text-emerald-400'
+                            : 'text-slate-400'
+                      return (
+                        <li
+                          key={`${p.surname}-${p.name}`}
+                          className="flex justify-between items-baseline py-2 border-b border-slate-700 last:border-0"
+                        >
+                          <span className="font-medium">{p.name} {p.surname}</span>
+                          <span className={`text-sm ${gamesColorClass}`}>{p.totalClubMatches} games</span>
+                        </li>
+                      )
+                    })}
                   </ul>
                 )}
               </section>
@@ -299,10 +313,28 @@ export default function Eligibility() {
         </aside>
       </main>
 
-      <footer className="fixed bottom-0 left-0 right-0 border-t border-slate-700 px-4 py-3 text-center text-slate-400 text-sm bg-slate-900">
-        © This tool is copyright to Andrew Sleight 2026
+      <footer className="fixed bottom-0 left-0 right-0 border-t border-slate-700 px-4 py-3 text-center text-slate-400 text-sm bg-slate-900 flex flex-wrap items-center justify-center gap-x-4 gap-y-1">
+        <span>© This tool is copyright to Andrew Sleight 2026</span>
+        <button
+          type="button"
+          onClick={() => setFeedbackOpen(true)}
+          className="text-emerald-400 hover:text-emerald-300 underline"
+        >
+          Feedback
+        </button>
       </footer>
 
+      <FeedbackModal
+        open={feedbackOpen}
+        onClose={() => setFeedbackOpen(false)}
+        onSubmit={async (subject, message) => {
+          const sendFeedback = httpsCallable<{ subject: string; message: string }, { success: boolean }>(
+            functions,
+            'sendFeedback'
+          )
+          await sendFeedback({ subject, message })
+        }}
+      />
       <HelpModal open={helpOpen} onClose={() => setHelpOpen(false)} title="Help">
         <div>
           <h3 className="font-semibold text-white mb-2">Obtaining the CSV file</h3>
@@ -311,15 +343,15 @@ export default function Eligibility() {
             <a href="https://results.bowlslink.com.au/event/888793b6-ee24-48f8-9eac-3895cea9f7f8" target="_blank" rel="noopener noreferrer" className="text-emerald-400 hover:text-emerald-300 underline">
               Bowls Victoria results portal
             </a>
-            . In the grey title box, click <strong>Event Info</strong>. Download the file &quot;Number of matches played per member, per competition * (download CSV file)&quot;.
+            . In the grey title box, click <strong>Event Info</strong>. Download the file &quot;Rounds played per member, per competition * (download CSV file)&quot;.
           </p>
           <h3 className="font-semibold text-white mb-2">Uploading the CSV</h3>
           <p className="mb-3">
-            Use the file input in the Matches CSV section to upload the downloaded CSV. The file is stored and used for all eligibility checks until you upload a new file.
+            Use the file input in the Rounds CSV section to upload the downloaded CSV. The file is stored and used for all eligibility checks until you upload a new file.
           </p>
           <h3 className="font-semibold text-white mb-2">Checking eligibility</h3>
           <p className="mb-3">
-            Choose a <strong>Nominated club</strong>, a <strong>Team</strong>, and which <strong>Rules</strong> to apply, then click <strong>Check eligibility</strong>. The list of eligible players appears with their total club games.
+            Choose a <strong>Nominated club</strong>, a <strong>Team</strong>, and which <strong>Rules</strong> to apply, then click <strong>Check eligibility</strong>. The list of eligible players appears with their total club games. Game counts are colour-coded: <span className="text-red-400">red</span> means more games in higher sides, <span className="text-emerald-400">green</span> means more games in lower sides, and grey means an equal split.
           </p>
           <h3 className="font-semibold text-white mb-2">Eligibility rules</h3>
           <p className="mb-3">

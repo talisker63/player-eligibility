@@ -1,23 +1,36 @@
 import Papa from 'papaparse'
 import type { CsvRow, ParsedData, PlayerAtClub, TeamGrade } from '../types/eligibility'
 
-const REQUIRED_COLUMNS = ['Surname', 'Name', 'Nominated Club', 'Team', 'Total Matches Played']
+const REQUIRED_COLUMNS = ['Surname', 'Name', 'Nominated Club', 'Team', 'Total Rounds Played']
 
 function extractGrade(team: string): number {
   const match = team.trim().match(/(\d+)$/)
   return match ? parseInt(match[1], 10) : 0
 }
 
-function normaliseRow(raw: Record<string, string>): CsvRow | null {
-  const total = raw['Total Matches Played']?.trim()
+function countFinalsInColumnsFThroughR(raw: Record<string, string>, headers: string[]): number {
+  const colsFThroughR = headers.slice(5, 18)
+  let count = 0
+  for (const col of colsFThroughR) {
+    const val = raw[col]?.trim() ?? ''
+    const matches = val.match(/\(f\)/g)
+    if (matches) count += matches.length
+  }
+  return count
+}
+
+function normaliseRow(raw: Record<string, string>, headers: string[]): CsvRow | null {
+  const total = raw['Total Rounds Played']?.trim()
   const num = total ? parseInt(total, 10) : NaN
   if (Number.isNaN(num) || num < 0) return null
+  const finalsCount = countFinalsInColumnsFThroughR(raw, headers)
+  const effectiveTotal = Math.max(0, num - finalsCount)
   return {
     surname: (raw['Surname'] ?? '').trim(),
     name: (raw['Name'] ?? '').trim(),
     nominatedClub: (raw['Nominated Club'] ?? '').trim(),
     team: (raw['Team'] ?? '').trim(),
-    totalMatchesPlayed: num,
+    totalMatchesPlayed: effectiveTotal,
   }
 }
 
@@ -38,7 +51,7 @@ export function parseCsv(csvText: string): { data: ParsedData; error?: string } 
 
   const aggregated = new Map<string, number>()
   for (const raw of parsed.data) {
-    const row = normaliseRow(raw)
+    const row = normaliseRow(raw, headers)
     if (!row || !row.nominatedClub || !row.team) continue
     const key = `${row.surname}|${row.name}|${row.nominatedClub}|${row.team}`
     aggregated.set(key, (aggregated.get(key) ?? 0) + row.totalMatchesPlayed)

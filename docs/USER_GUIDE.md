@@ -9,11 +9,11 @@
 
 1. Go to the [Bowls Victoria results portal](https://results.bowlslink.com.au/event/888793b6-ee24-48f8-9eac-3895cea9f7f8).
 2. In the grey title box, click **Event Info**.
-3. Download the file: **"Number of matches played per member, per competition * (download CSV file)"**.
+3. Download the file: **"Rounds played per member, per competition * (download CSV file)"**.
 
 ## Uploading the CSV
 
-1. Click **Choose File** (or equivalent) in the Matches CSV section.
+1. Click **Choose File** (or equivalent) in the Rounds CSV section.
 2. Select the downloaded CSV file.
 3. The file is uploaded to storage and the app loads clubs and teams from it.
 4. You can replace the file at any time by uploading a new CSV.
@@ -24,7 +24,7 @@
 2. Choose a **Team** from the dropdown (teams depend on the selected club).
 3. Choose which **Rules** to apply (see Eligibility Rules below).
 4. Click **Check eligibility**.
-5. The list of eligible players appears below, with their total club games shown.
+5. The list of eligible players appears below, with their total club games shown. Game counts are colour-coded: **red** indicates the player has played more games in higher sides than lower; **green** indicates more games in lower sides; grey indicates an equal split.
 
 ## Eligibility Rules
 

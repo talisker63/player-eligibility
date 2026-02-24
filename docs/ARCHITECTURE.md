@@ -2,7 +2,7 @@
 
 ## Overview
 
-Player Eligibility is a React SPA that parses Bowls Victoria match CSV data and computes which players are eligible for a selected team based on club-level rules.
+Player Eligibility is a React SPA that parses Bowls Victoria rounds CSV data and computes which players are eligible for a selected team based on club-level rules.
 
 ## Data Flow
 
@@ -34,7 +34,7 @@ Firebase SDK init. Uses env vars for config.
 ### `lib/csvParser.ts`
 
 - `parseCsv(csvText)` – parses CSV, validates required columns, aggregates rows by player/club/team
-- Required columns: Surname, Name, Nominated Club, Team, Total Matches Played
+- Required columns: Surname, Name, Nominated Club, Team, Total Rounds Played
 - Returns `ParsedData`: clubs, teamsByClub, playersByClub
 
 ### `lib/eligibility.ts`

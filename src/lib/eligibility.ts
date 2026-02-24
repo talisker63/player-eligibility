@@ -5,9 +5,26 @@ export type RuleSelection = 'rule1' | 'rule2' | 'both'
 const MIN_GAMES_IN_SIDE_OR_LOWER = 4
 const HIGHER_GRADE_THRESHOLD = 0.51
 
-function extractGrade(team: string): number {
+export function extractGrade(team: string): number {
   const match = team.trim().match(/(\d+)$/)
   return match ? parseInt(match[1], 10) : 0
+}
+
+export function getGamesBias(
+  player: EligiblePlayer,
+  selectedTeam: string
+): 'higher' | 'lower' | 'equal' {
+  const targetGrade = extractGrade(selectedTeam)
+  let matchesInHigher = 0
+  let matchesInLower = 0
+  for (const [team, matches] of Object.entries(player.matchesByTeam)) {
+    const grade = extractGrade(team)
+    if (grade < targetGrade) matchesInHigher += matches
+    else if (grade > targetGrade) matchesInLower += matches
+  }
+  if (matchesInHigher > matchesInLower) return 'higher'
+  if (matchesInLower > matchesInHigher) return 'lower'
+  return 'equal'
 }
 
 function matchesInSelectedOrLower(
