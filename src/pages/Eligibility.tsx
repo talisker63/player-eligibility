@@ -146,7 +146,7 @@ export default function Eligibility() {
       <header className="border-b border-slate-700 px-4 py-3 flex items-center justify-between">
         <div>
           <h1 className="text-xl font-bold">Player Eligibility</h1>
-          <p className="text-sm text-slate-400">Last three games or finals.</p>
+          <p className="text-sm text-slate-400">Check who is qualified to play in the last three games or the finals.</p>
         </div>
         <div className="flex items-center gap-2">
           <button
@@ -181,17 +181,35 @@ export default function Eligibility() {
         <section className="bg-slate-800 rounded-xl p-4">
           <h2 className="text-lg font-semibold mb-3">Rounds CSV</h2>
           <p className="text-slate-400 text-sm mb-3">
-            Download the file &quot;Rounds played per member, per competition * (download CSV file)&quot; from the{' '}
+            Download the file &quot;Rounds played per member, per competition * (download CSV file)&quot; from:
+          </p>
+          <div className="flex flex-col gap-3 mb-3">
             <a
               href="https://results.bowlslink.com.au/event/888793b6-ee24-48f8-9eac-3895cea9f7f8"
               target="_blank"
               rel="noopener noreferrer"
-              className="text-emerald-400 hover:text-emerald-300 underline"
+              className="text-emerald-400 hover:text-emerald-300 underline py-3 px-2 -mx-2 rounded-lg hover:bg-slate-700/50 active:bg-slate-700 min-h-[44px] flex items-center"
             >
-              Bowls Victoria results portal
+              Bowls Victoria Weekend results portal
             </a>
-            . In the grey title box, click &quot;Event Info&quot; to find the CSV download.
+            <a
+              href="https://results.bowlslink.com.au/event/acf7179a-2367-4254-86fc-8e87e2888534"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-emerald-400 hover:text-emerald-300 underline py-3 px-2 -mx-2 rounded-lg hover:bg-slate-700/50 active:bg-slate-700 min-h-[44px] flex items-center"
+            >
+              Bowls Victoria Midweek results portal
+            </a>
+          </div>
+          <p className="text-slate-400 text-sm mb-3">
+            In the grey title box, click &quot;Event Info&quot; to find the CSV download.
           </p>
+          <div className="mb-3 rounded-lg border border-slate-700 bg-slate-900/50 p-3">
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-300 mb-1">Data rules</p>
+            <p className="text-sm text-slate-400">
+              Eligibility totals use competition columns (6th-18th) when present, excluding 6-A-Side and 7-A-Side columns. Finals marked <strong>(f)</strong> are excluded. <strong>Total Rounds Played</strong> is used only when a row has no competition-column data.
+            </p>
+          </div>
           <label className="block">
             <span className="sr-only">Upload CSV</span>
             <input
@@ -367,7 +385,20 @@ export default function Eligibility() {
         )}
         </div>
         <aside className="w-72 shrink-0 self-start mt-12">
-          <div className="bg-slate-800/80 border border-slate-600 rounded-xl p-4 sticky top-4">
+          <div className="bg-slate-800/80 border border-slate-600 rounded-xl p-4">
+            <p className="text-sm text-slate-300 leading-relaxed mb-2">
+              Try Bowlscore — a single app for training (AI analytics), drills and scoring games.
+            </p>
+            <a
+              href="https://bowlscore.com.au"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-emerald-400 hover:text-emerald-300 underline font-medium"
+            >
+              bowlscore.com.au
+            </a>
+          </div>
+          <div className="bg-slate-800/80 border border-slate-600 rounded-xl p-4 mt-4">
             <p className="text-sm text-slate-300 leading-relaxed">
               This tool is an indicator only and any results that look suspicious should be checked manually using the Bowls Victoria Spreadsheet.
             </p>
@@ -405,17 +436,27 @@ export default function Eligibility() {
               The CSV must have columns: <strong>Surname</strong>, <strong>Name</strong>, <strong>Nominated Club</strong>, <strong>Team</strong>, and <strong>Total Rounds Played</strong>. The app aggregates rows by player (surname + name), club, and team, so multiple rows for the same player at the same club and team are summed.
             </p>
             <p className="mb-2 text-slate-300 text-sm">
-              If the spreadsheet has columns F–R (the 6th–18th columns), any cell that contains <strong>(f)</strong> is treated as a finals round. For every occurrence of <strong>(f)</strong> in those columns, 1 is subtracted from that row’s contribution to the total. Finals rounds are not used when calculating eligibility.
+              If the spreadsheet has competition columns (6th–18th columns), totals are calculated from those columns and <strong>6-A-Side</strong> and <strong>7-A-Side</strong> columns are excluded. <strong>Total Rounds Played</strong> is only used when no competition column data is present for that row.
+            </p>
+            <p className="mb-2 text-slate-300 text-sm">
+              Any cell containing <strong>(f)</strong> in included competition columns is treated as a finals round. For every occurrence of <strong>(f)</strong>, 1 is subtracted from that row’s contribution to the total. Finals rounds are not used when calculating eligibility.
             </p>
           </section>
           <section>
             <h3 className="font-semibold text-white mb-2">Obtaining the CSV file</h3>
             <p className="mb-2 text-slate-300 text-sm">
-              Go to the{' '}
-              <a href="https://results.bowlslink.com.au/event/888793b6-ee24-48f8-9eac-3895cea9f7f8" target="_blank" rel="noopener noreferrer" className="text-emerald-400 hover:text-emerald-300 underline">
-                Bowls Victoria results portal
+              Go to:
+            </p>
+            <div className="flex flex-col gap-3 mb-2">
+              <a href="https://results.bowlslink.com.au/event/888793b6-ee24-48f8-9eac-3895cea9f7f8" target="_blank" rel="noopener noreferrer" className="text-emerald-400 hover:text-emerald-300 underline py-3 px-2 -mx-2 rounded-lg hover:bg-slate-700/50 active:bg-slate-700 min-h-[44px] flex items-center w-fit">
+                Bowls Victoria Weekend results portal
               </a>
-              . In the grey title box, click <strong>Event Info</strong>. Download the file &quot;Rounds played per member, per competition * (download CSV file)&quot;.
+              <a href="https://results.bowlslink.com.au/event/acf7179a-2367-4254-86fc-8e87e2888534" target="_blank" rel="noopener noreferrer" className="text-emerald-400 hover:text-emerald-300 underline py-3 px-2 -mx-2 rounded-lg hover:bg-slate-700/50 active:bg-slate-700 min-h-[44px] flex items-center w-fit">
+                Bowls Victoria Midweek results portal
+              </a>
+            </div>
+            <p className="mb-2 text-slate-300 text-sm">
+              In the grey title box, click <strong>Event Info</strong>. Download the file &quot;Rounds played per member, per competition * (download CSV file)&quot;.
             </p>
           </section>
           <section>
@@ -427,7 +468,7 @@ export default function Eligibility() {
           <section>
             <h3 className="font-semibold text-white mb-2">Running a check</h3>
             <p className="mb-2 text-slate-300 text-sm">
-              Select <strong>Nominated club</strong>, then <strong>Team</strong>, then which <strong>Rules</strong> to apply. Click <strong>Check eligibility</strong>. The list of eligible players appears with each player’s total club games. The total is colour-coded: <span className="text-red-400">red</span> = more games in higher sides than lower, <span className="text-emerald-400">green</span> = more in lower sides, grey = equal split.
+              Select <strong>Nominated club</strong>, then <strong>Team</strong>, then which <strong>Rules</strong> to apply. Click <strong>Check eligibility</strong>. The list of eligible players appears with each player’s total club games. The total is colour-coded: <span className="text-red-400">red</span> = some games in higher sides (brought down), <span className="text-emerald-400">green</span> = some games in lower sides (brought up), grey = equal split.
             </p>
           </section>
           <section>

@@ -8,10 +8,13 @@ function extractGrade(team: string): number {
   return match ? parseInt(match[1], 10) : 0
 }
 
-function countFinalsInColumnsFThroughR(raw: Record<string, string>, headers: string[]): number {
-  const colsFThroughR = headers.slice(5, 18)
+function isIncludedCompetitionColumn(header: string): boolean {
+  return !/[67]-A-Side/i.test(header)
+}
+
+function countFinalsInColumns(raw: Record<string, string>, headers: string[]): number {
   let count = 0
-  for (const col of colsFThroughR) {
+  for (const col of headers) {
     const val = raw[col]?.trim() ?? ''
     const matches = val.match(/\(f\)/g)
     if (matches) count += matches.length
@@ -19,12 +22,35 @@ function countFinalsInColumnsFThroughR(raw: Record<string, string>, headers: str
   return count
 }
 
+function countRoundsFromColumns(raw: Record<string, string>, headers: string[]): number {
+  let total = 0
+  for (const col of headers) {
+    const val = raw[col]?.trim() ?? ''
+    if (!val) continue
+    const trailingTotal = val.match(/\((\d+)\)\s*$/)
+    if (trailingTotal) total += parseInt(trailingTotal[1], 10)
+  }
+  return total
+}
+
+function hasAnyCompetitionData(raw: Record<string, string>, headers: string[]): boolean {
+  return headers.some((col) => (raw[col]?.trim() ?? '') !== '')
+}
+
 function normaliseRow(raw: Record<string, string>, headers: string[]): CsvRow | null {
   const total = raw['Total Rounds Played']?.trim()
   const num = total ? parseInt(total, 10) : NaN
-  if (Number.isNaN(num) || num < 0) return null
-  const finalsCount = countFinalsInColumnsFThroughR(raw, headers)
-  const effectiveTotal = Math.max(0, num - finalsCount)
+  const competitionColumns = headers.slice(5, 18)
+  const includedCompetitionColumns = competitionColumns.filter(isIncludedCompetitionColumn)
+  const hasCompetitionColumns = competitionColumns.length > 0
+  const hasCompetitionDataInRow = hasAnyCompetitionData(raw, competitionColumns)
+  const roundsFromIncludedColumns = countRoundsFromColumns(raw, includedCompetitionColumns)
+  const baseTotal = hasCompetitionColumns && hasCompetitionDataInRow
+    ? roundsFromIncludedColumns
+    : num
+  if (Number.isNaN(baseTotal) || baseTotal < 0) return null
+  const finalsCount = countFinalsInColumns(raw, includedCompetitionColumns)
+  const effectiveTotal = Math.max(0, baseTotal - finalsCount)
   return {
     surname: (raw['Surname'] ?? '').trim(),
     name: (raw['Name'] ?? '').trim(),
@@ -35,14 +61,28 @@ function normaliseRow(raw: Record<string, string>, headers: string[]): CsvRow | 
 }
 
 export function parseCsv(csvText: string): { data: ParsedData; error?: string } {
-  const firstLineEnd = csvText.indexOf('\n')
-  const textWithoutRow1 = firstLineEnd === -1 ? '' : csvText.slice(firstLineEnd + 1)
-  const parsed = Papa.parse<Record<string, string>>(textWithoutRow1, { header: true, skipEmptyLines: true })
+  const parseOptions = { header: true, skipEmptyLines: true } as const
+  let parsed = Papa.parse<Record<string, string>>(csvText, parseOptions)
+  let headers = parsed.meta.fields ?? []
+
+  const hasRequiredColumns = (candidateHeaders: string[]) => REQUIRED_COLUMNS.every((col) => candidateHeaders.includes(col))
+
+  if (!hasRequiredColumns(headers)) {
+    const firstLineEnd = csvText.indexOf('\n')
+    const textWithoutRow1 = firstLineEnd === -1 ? '' : csvText.slice(firstLineEnd + 1)
+    const fallbackParsed = Papa.parse<Record<string, string>>(textWithoutRow1, parseOptions)
+    const fallbackHeaders = fallbackParsed.meta.fields ?? []
+    if (hasRequiredColumns(fallbackHeaders)) {
+      parsed = fallbackParsed
+      headers = fallbackHeaders
+    }
+  }
+
   if (parsed.errors.length > 0) {
     const first = parsed.errors[0]
     return { data: { clubs: [], teamsByClub: {}, playersByClub: {} }, error: first?.message ?? 'Parse error' }
   }
-  const headers = parsed.meta.fields ?? []
+
   for (const col of REQUIRED_COLUMNS) {
     if (!headers.includes(col)) {
       return { data: { clubs: [], teamsByClub: {}, playersByClub: {} }, error: `Missing column: ${col}` }
