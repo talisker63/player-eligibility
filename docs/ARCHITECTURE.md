@@ -8,7 +8,7 @@ Player Eligibility is a React SPA that parses Bowls Victoria rounds CSV data and
 
 1. User signs in (Firebase Auth)
 2. App loads CSV from Firebase Storage (`matches-data/matches-played-count-per-member.csv`)
-3. CSV is parsed with PapaParse; rows are aggregated by player, club, team; totals are derived from competition columns F–R excluding 6-A-Side and 7-A-Side columns; rounds marked (f) in included columns are excluded from totals
+3. CSV is parsed with PapaParse; rows are aggregated by player, club, team; finals rounds marked (f) are excluded from totals
 4. User selects Nominated Club and Team
 5. `getEligiblePlayers()` filters by: min 4 club games, < 51% games in higher teams
 6. Results are rendered in the UI; user can click a player to see games per division (from `matchesByTeam`), then close with X
@@ -33,7 +33,7 @@ Firebase SDK init. Uses env vars for config.
 
 ### `lib/csvParser.ts`
 
-- `parseCsv(csvText)` – parses CSV, validates required columns, aggregates rows by player/club/team; derives totals from included competition columns (F–R excluding 6-A-Side and 7-A-Side), subtracts 1 per "(f)" in included columns, and falls back to `Total Rounds Played` when a row has no competition-column data
+- `parseCsv(csvText)` – parses CSV, validates required columns, aggregates rows by player/club/team, and excludes finals rounds marked "(f)" from totals
 - Required columns: Surname, Name, Nominated Club, Team, Total Rounds Played (competition columns are optional)
 - Returns `ParsedData`: clubs, teamsByClub, playersByClub
 

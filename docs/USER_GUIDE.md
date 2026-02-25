@@ -22,10 +22,7 @@
 
 - The CSV must include: **Surname**, **Name**, **Nominated Club**, **Team**, and **Total Rounds Played**.
 - Each row is aggregated by player (surname + name), club, and team. Multiple rows for the same player at the same club and team are summed.
-- If the spreadsheet has competition columns F–R (6th–18th columns), round totals are calculated from those columns.
-- **6-A-Side and 7-A-Side columns are excluded** from totals and eligibility calculations.
-- **Total Rounds Played** is only used when no competition-column data is present for that row.
-- **Finals exclusion**: In included competition columns, any cell containing **(f)** is treated as a finals round. For each occurrence of **(f)**, 1 is subtracted from that row’s contribution to the total rounds. Finals rounds are not counted toward eligibility.
+- **Finals exclusion**: Finals rounds are not counted toward eligibility.
 
 ## Checking Eligibility
 

@@ -128,6 +128,7 @@ export default function Eligibility() {
 
   const selectedPlayerByTeam = selectedPlayer
     ? Object.entries(selectedPlayer.matchesByTeam)
+      .filter(([, games]) => games > 0)
       .map(([teamName, games]) => ({
         teamName,
         grade: extractGrade(teamName),
@@ -204,12 +205,6 @@ export default function Eligibility() {
           <p className="text-slate-400 text-sm mb-3">
             In the grey title box, click &quot;Event Info&quot; to find the CSV download.
           </p>
-          <div className="mb-3 rounded-lg border border-slate-700 bg-slate-900/50 p-3">
-            <p className="text-xs font-semibold uppercase tracking-wide text-slate-300 mb-1">Data rules</p>
-            <p className="text-sm text-slate-400">
-              Eligibility totals use competition columns (6th-18th) when present, excluding 6-A-Side and 7-A-Side columns. Finals marked <strong>(f)</strong> are excluded. <strong>Total Rounds Played</strong> is used only when a row has no competition-column data.
-            </p>
-          </div>
           <label className="block">
             <span className="sr-only">Upload CSV</span>
             <input
@@ -436,10 +431,7 @@ export default function Eligibility() {
               The CSV must have columns: <strong>Surname</strong>, <strong>Name</strong>, <strong>Nominated Club</strong>, <strong>Team</strong>, and <strong>Total Rounds Played</strong>. The app aggregates rows by player (surname + name), club, and team, so multiple rows for the same player at the same club and team are summed.
             </p>
             <p className="mb-2 text-slate-300 text-sm">
-              If the spreadsheet has competition columns (6th–18th columns), totals are calculated from those columns and <strong>6-A-Side</strong> and <strong>7-A-Side</strong> columns are excluded. <strong>Total Rounds Played</strong> is only used when no competition column data is present for that row.
-            </p>
-            <p className="mb-2 text-slate-300 text-sm">
-              Any cell containing <strong>(f)</strong> in included competition columns is treated as a finals round. For every occurrence of <strong>(f)</strong>, 1 is subtracted from that row’s contribution to the total. Finals rounds are not used when calculating eligibility.
+              Finals rounds are not counted toward eligibility calculations.
             </p>
           </section>
           <section>
