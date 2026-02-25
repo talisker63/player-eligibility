@@ -1,6 +1,6 @@
 import { signOut } from 'firebase/auth'
 import { useCallback, useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { auth, functions, httpsCallable } from '../lib/firebase'
 import { downloadCsvFromStorage, uploadCsvToStorage } from '../lib/storage'
 import { parseCsv } from '../lib/csvParser'
@@ -403,6 +403,9 @@ export default function Eligibility() {
 
       <footer className="fixed bottom-0 left-0 right-0 border-t border-slate-700 px-4 py-3 text-center text-slate-400 text-sm bg-slate-900 flex flex-wrap items-center justify-center gap-x-4 gap-y-1">
         <span>© This tool is copyright to Andrew Sleight 2026</span>
+        <Link to="/terms" className="text-emerald-400 hover:text-emerald-300 underline">
+          Terms &amp; Privacy
+        </Link>
         <button
           type="button"
           onClick={() => setFeedbackOpen(true)}
