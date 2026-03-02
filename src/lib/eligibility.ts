@@ -1,6 +1,6 @@
 import type { ParsedData, EligiblePlayer } from '../types/eligibility'
 
-export type RuleSelection = 'rule1' | 'rule2' | 'both'
+export type RuleSelection = 'rule1' | 'rule2'
 
 const MIN_GAMES_IN_SIDE_OR_LOWER = 4
 const HIGHER_GRADE_THRESHOLD = 0.51
@@ -44,7 +44,7 @@ export function getEligiblePlayers(
   data: ParsedData,
   nominatedClub: string,
   selectedTeam: string,
-  ruleSelection: RuleSelection = 'both'
+  ruleSelection: RuleSelection = 'rule1'
 ): EligiblePlayer[] {
   const players = data.playersByClub[nominatedClub]
   if (!players) return []
@@ -55,7 +55,7 @@ export function getEligiblePlayers(
       matchesInSelectedOrLower(p, targetGrade, extractGrade) >= MIN_GAMES_IN_SIDE_OR_LOWER
 
     let passesRule2 = true
-    if (ruleSelection === 'rule2' || ruleSelection === 'both') {
+    if (ruleSelection === 'rule2') {
       if (p.totalClubMatches < 1) return false
       let matchesInHigherTeams = 0
       for (const [team, matches] of Object.entries(p.matchesByTeam)) {
@@ -67,8 +67,7 @@ export function getEligiblePlayers(
     }
 
     if (ruleSelection === 'rule1') return passesRule1
-    if (ruleSelection === 'rule2') return passesRule2
-    return passesRule1 && passesRule2
+    return passesRule2
   }).map((p) => ({
     surname: p.surname,
     name: p.name,

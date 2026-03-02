@@ -2,6 +2,7 @@ import { signOut } from 'firebase/auth'
 import { useCallback, useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { auth, functions, httpsCallable } from '../lib/firebase'
+import { logEvent } from '../lib/analytics'
 import { downloadCsvFromStorage, uploadCsvToStorage } from '../lib/storage'
 import { parseCsv } from '../lib/csvParser'
 import { extractGrade, getEligiblePlayers, getGamesBias, type RuleSelection } from '../lib/eligibility'
@@ -23,7 +24,7 @@ export default function Eligibility() {
   const [team, setTeam] = useState('')
   const [eligible, setEligible] = useState<EligiblePlayer[] | null>(null)
   const [selectedPlayer, setSelectedPlayer] = useState<EligiblePlayer | null>(null)
-  const [ruleSelection, setRuleSelection] = useState<RuleSelection>('both')
+  const [ruleSelection, setRuleSelection] = useState<RuleSelection>('rule1')
   const [sortBy, setSortBy] = useState<'name-asc' | 'name-desc' | 'games-asc' | 'games-desc'>('name-asc')
   const [helpOpen, setHelpOpen] = useState(false)
   const [feedbackOpen, setFeedbackOpen] = useState(false)
@@ -66,6 +67,7 @@ export default function Eligibility() {
         return
       }
       await uploadCsvToStorage(csvText)
+      logEvent('csv_uploaded')
       setData(parsed)
       setLoadError(null)
       setClub('')
@@ -100,6 +102,7 @@ export default function Eligibility() {
 
   function handleCheck() {
     if (!data || !club || !team) return
+    logEvent('eligibility_check', { rule: ruleSelection })
     setEligible(getEligiblePlayers(data, club, team, ruleSelection))
     setSelectedPlayer(null)
   }
@@ -262,19 +265,32 @@ export default function Eligibility() {
                 </select>
               </div>
               <div>
-                <label htmlFor="rules" className="block text-sm font-medium text-slate-300 mb-2">
-                  Rules
-                </label>
-                <select
-                  id="rules"
-                  value={ruleSelection}
-                  onChange={(e) => handleRuleChange(e.target.value as RuleSelection)}
-                  className={selectClass}
-                >
-                  <option value="rule1">Four week rule only (4+ games in selected team or lower sides)</option>
-                  <option value="rule2">51% rule only</option>
-                  <option value="both">Both rules</option>
-                </select>
+                <span className="block text-sm font-medium text-slate-300 mb-2">Rules</span>
+                <fieldset className="flex flex-col gap-2" role="radiogroup" aria-labelledby="rules-label">
+                  <label id="rules-label" className="sr-only">Eligibility rule</label>
+                  <label className="flex items-center gap-2 cursor-pointer text-slate-300">
+                    <input
+                      type="radio"
+                      name="rules"
+                      value="rule1"
+                      checked={ruleSelection === 'rule1'}
+                      onChange={() => handleRuleChange('rule1')}
+                      className="w-4 h-4 text-emerald-600 bg-slate-700 border-slate-600 focus:ring-emerald-500"
+                    />
+                    Four week rule (4+ games in selected team or lower sides)
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer text-slate-300">
+                    <input
+                      type="radio"
+                      name="rules"
+                      value="rule2"
+                      checked={ruleSelection === 'rule2'}
+                      onChange={() => handleRuleChange('rule2')}
+                      className="w-4 h-4 text-emerald-600 bg-slate-700 border-slate-600 focus:ring-emerald-500"
+                    />
+                    51% rule
+                  </label>
+                </fieldset>
               </div>
               <button
                 type="button"
@@ -309,7 +325,6 @@ export default function Eligibility() {
                   <p className="text-slate-400">
                     {ruleSelection === 'rule1' && 'No eligible players (4+ games in selected team or lower sides required).'}
                     {ruleSelection === 'rule2' && 'No eligible players (fewer than 51% of games in higher teams required).'}
-                    {ruleSelection === 'both' && 'No eligible players (both rules: 4+ games in selected team or lower sides, and fewer than 51% in higher teams).'}
                   </p>
                 ) : selectedPlayer ? (
                   <div className="space-y-4">
@@ -484,7 +499,7 @@ export default function Eligibility() {
               <strong>Rule 1 (Four week rule)</strong>: The player must have at least 4 games in the selected team or lower-grade sides for that club (e.g. for Premier 2, count Premier 2, Premier 3, etc.).
             </p>
             <p className="mb-2 text-slate-300 text-sm">
-              <strong>Rule 2 (51% rule)</strong>: Fewer than 51% of the player’s club games must have been in teams higher than the selected team (e.g. Premier 1 is higher than Premier 2). You can apply Rule 1 only, Rule 2 only, or <strong>Both rules</strong>.
+              <strong>Rule 2 (51% rule)</strong>: Fewer than 51% of the player’s club games must have been in teams higher than the selected team (e.g. Premier 1 is higher than Premier 2). You can apply the Four week rule or the 51% rule.
             </p>
           </section>
           <section>

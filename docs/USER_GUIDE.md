@@ -39,11 +39,10 @@
 
 ## Eligibility Rules
 
-You can select which rule(s) to apply when checking eligibility:
+You can select which rule to apply when checking eligibility (Four week rule is the default):
 
 - **Rule 1 (Four week rule)**: The player must have at least 4 games in the selected team or lower-grade sides for that club (e.g. for Premier 2, count games in Premier 2, Premier 3, etc.).
 - **Rule 2 (51% rule)**: Fewer than 51% of the player’s club games were in teams higher than the selected team (e.g. Premier 1 is higher than Premier 2).
-- **Both rules**: The player must satisfy both Rule 1 and Rule 2.
 
 ## Important Notice
 
