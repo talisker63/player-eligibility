@@ -30,4 +30,5 @@ export interface ParsedData {
   clubs: string[]
   teamsByClub: Record<string, TeamGrade[]>
   playersByClub: Record<string, PlayerAtClub[]>
+  playerKeysInMultipleClubs: string[]
 }

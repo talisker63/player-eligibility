@@ -80,12 +80,12 @@ export function parseCsv(csvText: string): { data: ParsedData; error?: string } 
 
   if (parsed.errors.length > 0) {
     const first = parsed.errors[0]
-    return { data: { clubs: [], teamsByClub: {}, playersByClub: {} }, error: first?.message ?? 'Parse error' }
+    return { data: { clubs: [], teamsByClub: {}, playersByClub: {}, playerKeysInMultipleClubs: [] }, error: first?.message ?? 'Parse error' }
   }
 
   for (const col of REQUIRED_COLUMNS) {
     if (!headers.includes(col)) {
-      return { data: { clubs: [], teamsByClub: {}, playersByClub: {} }, error: `Missing column: ${col}` }
+      return { data: { clubs: [], teamsByClub: {}, playersByClub: {}, playerKeysInMultipleClubs: [] }, error: `Missing column: ${col}` }
     }
   }
 
@@ -100,16 +100,19 @@ export function parseCsv(csvText: string): { data: ParsedData; error?: string } 
   const clubsSet = new Set<string>()
   const teamsByClub = new Map<string, Map<string, number>>()
   const playersByClub = new Map<string, Map<string, PlayerAtClub>>()
+  const clubsByPlayerKey = new Map<string, Set<string>>()
 
   for (const [key, total] of aggregated) {
     const [surname, name, nominatedClub, team] = key.split('|')
     clubsSet.add(nominatedClub)
+    const playerKey = `${surname}|${name}`
+    if (!clubsByPlayerKey.has(playerKey)) clubsByPlayerKey.set(playerKey, new Set())
+    clubsByPlayerKey.get(playerKey)!.add(nominatedClub)
     if (!teamsByClub.has(nominatedClub)) teamsByClub.set(nominatedClub, new Map())
     const teamGrades = teamsByClub.get(nominatedClub)!
     const grade = extractGrade(team)
     if (!teamGrades.has(team)) teamGrades.set(team, grade)
 
-    const playerKey = `${surname}|${name}`
     if (!playersByClub.has(nominatedClub)) playersByClub.set(nominatedClub, new Map())
     const clubPlayers = playersByClub.get(nominatedClub)!
     let player = clubPlayers.get(playerKey)
@@ -131,6 +134,9 @@ export function parseCsv(csvText: string): { data: ParsedData; error?: string } 
   const clubs = Array.from(clubsSet).sort()
   const resultTeamsByClub: Record<string, TeamGrade[]> = {}
   const resultPlayersByClub: Record<string, PlayerAtClub[]> = {}
+  const playerKeysInMultipleClubs = Array.from(clubsByPlayerKey.entries())
+    .filter(([, clubs]) => clubs.size > 1)
+    .map(([k]) => k)
 
   for (const club of clubs) {
     const teamMap = teamsByClub.get(club)
@@ -146,6 +152,7 @@ export function parseCsv(csvText: string): { data: ParsedData; error?: string } 
       clubs,
       teamsByClub: resultTeamsByClub,
       playersByClub: resultPlayersByClub,
+      playerKeysInMultipleClubs,
     },
   }
 }

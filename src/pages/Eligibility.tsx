@@ -115,6 +115,17 @@ export default function Eligibility() {
   const teams: TeamGrade[] = (data && club ? data.teamsByClub[club] ?? [] : [])
   const canCheck = data && club && team
 
+  const multiClubInThisClub =
+    data && club && eligible !== null
+      ? (data.playersByClub[club] ?? []).filter((p) =>
+          (data.playerKeysInMultipleClubs ?? []).includes(`${p.surname}|${p.name}`)
+        )
+      : []
+  const showMultiClubWarnings = multiClubInThisClub.length > 0
+  const multiClubKeySet = showMultiClubWarnings
+    ? new Set(multiClubInThisClub.map((p) => `${p.surname}|${p.name}`))
+    : new Set<string>()
+
   const sortedEligible = eligible === null ? [] : (() => {
     const list = [...eligible]
     if (sortBy === 'name-asc') {
@@ -321,6 +332,11 @@ export default function Eligibility() {
                     </select>
                   )}
                 </div>
+                {showMultiClubWarnings && (
+                  <div className="mb-3 px-3 py-2 rounded-lg bg-amber-500/20 border border-amber-500/50 text-amber-200 text-sm">
+                    {multiClubInThisClub.length} player{multiClubInThisClub.length !== 1 ? 's' : ''} in this club have also played for other clubs. Check eligibility rules for multi-club players.
+                  </div>
+                )}
                 {eligible.length === 0 ? (
                   <p className="text-slate-400">
                     {ruleSelection === 'rule1' && 'No eligible players (4+ games in selected team or lower sides required).'}
@@ -376,14 +392,27 @@ export default function Eligibility() {
                           key={`${p.surname}-${p.name}`}
                           className="flex justify-between items-baseline py-2 border-b border-slate-700 last:border-0"
                         >
-                          <button
-                            type="button"
-                            onClick={() => setSelectedPlayer(p)}
-                            className="font-medium text-left hover:underline decoration-slate-500 underline-offset-4"
-                          >
-                            {p.name} {p.surname}
-                          </button>
-                          <span className={`text-sm ${gamesColorClass}`}>{p.totalClubMatches} games</span>
+                          <div className="min-w-0 flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => setSelectedPlayer(p)}
+                              className="font-medium text-left hover:underline decoration-slate-500 underline-offset-4"
+                            >
+                              {p.name} {p.surname}
+                            </button>
+                            {multiClubKeySet.has(`${p.surname}|${p.name}`) && (
+                              <span
+                                className="shrink-0 inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs bg-amber-500/20 text-amber-300 border border-amber-500/50"
+                                title="Also played for other club(s)"
+                              >
+                                <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
+                                  <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                                </svg>
+                                Other club(s)
+                              </span>
+                            )}
+                          </div>
+                          <span className={`text-sm shrink-0 ${gamesColorClass}`}>{p.totalClubMatches} games</span>
                         </li>
                       )
                     })}
