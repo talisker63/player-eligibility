@@ -68,7 +68,7 @@ export default function Home() {
     <div className="min-h-screen bg-slate-900 text-white flex flex-col items-center justify-center gap-6 px-4">
       <div className="text-center">
         <h1 className="text-3xl font-bold">Player Eligibility</h1>
-        <p className="text-slate-400 mt-1">Last three games or finals.</p>
+        <p className="text-slate-400 mt-1">Check who is qualified to play in the last three games or the finals.</p>
       </div>
       <div className="w-full max-w-md bg-slate-800 rounded-xl p-6 shadow-xl">
         <div className="flex gap-2 mb-6">

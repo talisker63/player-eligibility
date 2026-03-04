@@ -7,7 +7,7 @@
 
 ## Obtaining the CSV File
 
-1. Go to the [Bowls Victoria results portal](https://results.bowlslink.com.au/event/888793b6-ee24-48f8-9eac-3895cea9f7f8).
+1. Go to the [Bowls Victoria Weekend results portal](https://results.bowlslink.com.au/event/888793b6-ee24-48f8-9eac-3895cea9f7f8) or the [Bowls Victoria Midweek results portal](https://results.bowlslink.com.au/event/acf7179a-2367-4254-86fc-8e87e2888534), depending on which competition you need.
 2. In the grey title box, click **Event Info**.
 3. Download the file: **"Rounds played per member, per competition * (download CSV file)"**.
 
@@ -20,9 +20,9 @@
 
 ## How the data is analysed
 
-- The CSV must include: **Surname**, **Name**, **Nominated Club**, **Team**, and **Total Rounds Played**. Optional columns (e.g. round-by-round data in columns F–R) can also be present.
+- The CSV must include: **Surname**, **Name**, **Nominated Club**, **Team**, and **Total Rounds Played**.
 - Each row is aggregated by player (surname + name), club, and team. Multiple rows for the same player at the same club and team are summed.
-- **Finals exclusion**: If the spreadsheet has columns F–R (6th–18th columns), any cell containing **(f)** is treated as a finals round. For each occurrence of **(f)** in those columns, 1 is subtracted from that row’s contribution to the total rounds. Finals rounds are not counted toward eligibility.
+- **Finals exclusion**: Finals rounds are not counted toward eligibility.
 
 ## Checking Eligibility
 
@@ -30,7 +30,11 @@
 2. Choose a **Team** from the dropdown (teams depend on the selected club).
 3. Choose which **Rules** to apply (see Eligibility Rules below).
 4. Click **Check eligibility**.
-5. The list of eligible players appears below, with their total club games shown. Game counts are colour-coded: **red** indicates the player has played more games in higher sides than lower; **green** indicates more games in lower sides; grey indicates an equal split.
+5. The list of eligible players appears below, with their total club games shown. Game counts are colour-coded: **red** indicates the player has played some games in higher sides (brought down); **green** indicates some games in lower sides (brought up); grey indicates an equal split.
+
+## Multi-club player warnings
+
+When the club you are analysing has players who appear for more than one Nominated Club in the CSV, the app shows a warning banner above the results and marks each such player with an **Other club(s)** badge. Eligibility is calculated using only games at the nominated club; the warning prompts you to check the rules for multi-club players manually.
 
 ## Viewing player details
 
@@ -39,11 +43,10 @@
 
 ## Eligibility Rules
 
-You can select which rule(s) to apply when checking eligibility:
+You can select which rule to apply when checking eligibility (Four week rule is the default):
 
 - **Rule 1 (Four week rule)**: The player must have at least 4 games in the selected team or lower-grade sides for that club (e.g. for Premier 2, count games in Premier 2, Premier 3, etc.).
 - **Rule 2 (51% rule)**: Fewer than 51% of the player’s club games were in teams higher than the selected team (e.g. Premier 1 is higher than Premier 2).
-- **Both rules**: The player must satisfy both Rule 1 and Rule 2.
 
 ## Important Notice
 

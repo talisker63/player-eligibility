@@ -1,7 +1,9 @@
 import { signOut } from 'firebase/auth'
+import { jsPDF } from 'jspdf'
 import { useCallback, useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { auth, functions, httpsCallable } from '../lib/firebase'
+import { logEvent } from '../lib/analytics'
 import { downloadCsvFromStorage, uploadCsvToStorage } from '../lib/storage'
 import { parseCsv } from '../lib/csvParser'
 import { extractGrade, getEligiblePlayers, getGamesBias, type RuleSelection } from '../lib/eligibility'
@@ -11,6 +13,8 @@ import type { EligiblePlayer, ParsedData, TeamGrade } from '../types/eligibility
 
 const selectClass =
   'w-full px-4 py-3 rounded-lg bg-slate-700 border border-slate-600 text-white focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent disabled:opacity-60'
+const compactSelectClass =
+  'px-2.5 py-1.5 rounded-md bg-slate-700 border border-slate-600 text-slate-100 text-xs leading-5 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent disabled:opacity-60'
 
 export default function Eligibility() {
   const navigate = useNavigate()
@@ -23,7 +27,7 @@ export default function Eligibility() {
   const [team, setTeam] = useState('')
   const [eligible, setEligible] = useState<EligiblePlayer[] | null>(null)
   const [selectedPlayer, setSelectedPlayer] = useState<EligiblePlayer | null>(null)
-  const [ruleSelection, setRuleSelection] = useState<RuleSelection>('both')
+  const [ruleSelection, setRuleSelection] = useState<RuleSelection>('rule1')
   const [sortBy, setSortBy] = useState<'name-asc' | 'name-desc' | 'games-asc' | 'games-desc'>('name-asc')
   const [helpOpen, setHelpOpen] = useState(false)
   const [feedbackOpen, setFeedbackOpen] = useState(false)
@@ -66,6 +70,7 @@ export default function Eligibility() {
         return
       }
       await uploadCsvToStorage(csvText)
+      logEvent('csv_uploaded')
       setData(parsed)
       setLoadError(null)
       setClub('')
@@ -100,8 +105,84 @@ export default function Eligibility() {
 
   function handleCheck() {
     if (!data || !club || !team) return
+    logEvent('eligibility_check', { rule: ruleSelection })
     setEligible(getEligiblePlayers(data, club, team, ruleSelection))
     setSelectedPlayer(null)
+  }
+
+  function handleDownloadEligiblePlayers(format: 'txt' | 'pdf' | 'csv') {
+    if (!club || !team || sortedEligible.length === 0) return
+    const title = `Club: ${club} | Team: ${team} | Total players: ${sortedEligible.length}`
+    const safeClub = club.replace(/[^a-z0-9]+/gi, '-').replace(/^-+|-+$/g, '').toLowerCase()
+    const escapeCsvField = (value: string | number) => `"${String(value).replace(/"/g, '""')}"`
+    const safeTeam = team.replace(/[^a-z0-9]+/gi, '-').replace(/^-+|-+$/g, '').toLowerCase()
+    const stamp = new Date().toISOString().slice(0, 10)
+    const filePrefix = `eligible-players-${safeClub || 'club'}-${safeTeam || 'team'}-${stamp}`
+    const createDownload = (blob: Blob, filename: string) => {
+      const downloadUrl = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = downloadUrl
+      link.download = filename
+      link.click()
+      URL.revokeObjectURL(downloadUrl)
+    }
+
+    if (format === 'csv') {
+      const rows = sortedEligible.map((player) =>
+        [
+          player.surname,
+          player.name,
+          player.totalClubMatches,
+          player.matchesByTeam[team] ?? 0,
+        ]
+          .map(escapeCsvField)
+          .join(',')
+      )
+      const csvContent = [
+        escapeCsvField(title),
+        'Surname,Name,Total Club Games,Games In Selected Team',
+        ...rows,
+      ].join('\n')
+      createDownload(new Blob([csvContent], { type: 'text/csv;charset=utf-8;' }), `${filePrefix}.csv`)
+    } else if (format === 'txt') {
+      const lines = sortedEligible.map(
+        (player, index) =>
+          `${index + 1}. ${player.name} ${player.surname} | Total Club Games: ${player.totalClubMatches} | Games In ${team}: ${player.matchesByTeam[team] ?? 0}`
+      )
+      const txtContent = [title, '', ...lines].join('\n')
+      createDownload(new Blob([txtContent], { type: 'text/plain;charset=utf-8;' }), `${filePrefix}.txt`)
+    } else {
+      const doc = new jsPDF()
+      const pageHeight = doc.internal.pageSize.getHeight()
+      let y = 16
+      doc.setFontSize(12)
+      const titleLines = doc.splitTextToSize(title, 180)
+      for (const line of titleLines) {
+        if (y > pageHeight - 10) {
+          doc.addPage()
+          y = 16
+        }
+        doc.text(line, 14, y)
+        y += 6
+      }
+      y += 2
+      doc.setFontSize(10)
+      for (let i = 0; i < sortedEligible.length; i += 1) {
+        const player = sortedEligible[i]
+        const line = `${i + 1}. ${player.name} ${player.surname} | Total: ${player.totalClubMatches} | In ${team}: ${player.matchesByTeam[team] ?? 0}`
+        const wrapped = doc.splitTextToSize(line, 180)
+        for (const part of wrapped) {
+          if (y > pageHeight - 10) {
+            doc.addPage()
+            y = 16
+          }
+          doc.text(part, 14, y)
+          y += 5
+        }
+      }
+      doc.save(`${filePrefix}.pdf`)
+    }
+    logEvent('eligible_players_downloaded', { team, club, format })
   }
 
   async function handleSignOut() {
@@ -111,6 +192,17 @@ export default function Eligibility() {
 
   const teams: TeamGrade[] = (data && club ? data.teamsByClub[club] ?? [] : [])
   const canCheck = data && club && team
+
+  const multiClubInThisClub =
+    data && club && eligible !== null
+      ? (data.playersByClub[club] ?? []).filter((p) =>
+          (data.playerKeysInMultipleClubs ?? []).includes(`${p.surname}|${p.name}`)
+        )
+      : []
+  const showMultiClubWarnings = multiClubInThisClub.length > 0
+  const multiClubKeySet = showMultiClubWarnings
+    ? new Set(multiClubInThisClub.map((p) => `${p.surname}|${p.name}`))
+    : new Set<string>()
 
   const sortedEligible = eligible === null ? [] : (() => {
     const list = [...eligible]
@@ -128,6 +220,7 @@ export default function Eligibility() {
 
   const selectedPlayerByTeam = selectedPlayer
     ? Object.entries(selectedPlayer.matchesByTeam)
+      .filter(([, games]) => games > 0)
       .map(([teamName, games]) => ({
         teamName,
         grade: extractGrade(teamName),
@@ -146,7 +239,7 @@ export default function Eligibility() {
       <header className="border-b border-slate-700 px-4 py-3 flex items-center justify-between">
         <div>
           <h1 className="text-xl font-bold">Player Eligibility</h1>
-          <p className="text-sm text-slate-400">Last three games or finals.</p>
+          <p className="text-sm text-slate-400">Check who is qualified to play in the last three games or the finals.</p>
         </div>
         <div className="flex items-center gap-2">
           <button
@@ -181,16 +274,28 @@ export default function Eligibility() {
         <section className="bg-slate-800 rounded-xl p-4">
           <h2 className="text-lg font-semibold mb-3">Rounds CSV</h2>
           <p className="text-slate-400 text-sm mb-3">
-            Download the file &quot;Rounds played per member, per competition * (download CSV file)&quot; from the{' '}
+            Download the file &quot;Rounds played per member, per competition * (download CSV file)&quot; from:
+          </p>
+          <div className="flex flex-col gap-3 mb-3">
             <a
               href="https://results.bowlslink.com.au/event/888793b6-ee24-48f8-9eac-3895cea9f7f8"
               target="_blank"
               rel="noopener noreferrer"
-              className="text-emerald-400 hover:text-emerald-300 underline"
+              className="text-emerald-400 hover:text-emerald-300 underline py-3 px-2 -mx-2 rounded-lg hover:bg-slate-700/50 active:bg-slate-700 min-h-[44px] flex items-center"
             >
-              Bowls Victoria results portal
+              Bowls Victoria Weekend results portal
             </a>
-            . In the grey title box, click &quot;Event Info&quot; to find the CSV download.
+            <a
+              href="https://results.bowlslink.com.au/event/acf7179a-2367-4254-86fc-8e87e2888534"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-emerald-400 hover:text-emerald-300 underline py-3 px-2 -mx-2 rounded-lg hover:bg-slate-700/50 active:bg-slate-700 min-h-[44px] flex items-center"
+            >
+              Bowls Victoria Midweek results portal
+            </a>
+          </div>
+          <p className="text-slate-400 text-sm mb-3">
+            In the grey title box, click &quot;Event Info&quot; to find the CSV download.
           </p>
           <label className="block">
             <span className="sr-only">Upload CSV</span>
@@ -249,19 +354,32 @@ export default function Eligibility() {
                 </select>
               </div>
               <div>
-                <label htmlFor="rules" className="block text-sm font-medium text-slate-300 mb-2">
-                  Rules
-                </label>
-                <select
-                  id="rules"
-                  value={ruleSelection}
-                  onChange={(e) => handleRuleChange(e.target.value as RuleSelection)}
-                  className={selectClass}
-                >
-                  <option value="rule1">Four week rule only (4+ games in selected team or lower sides)</option>
-                  <option value="rule2">51% rule only</option>
-                  <option value="both">Both rules</option>
-                </select>
+                <span className="block text-sm font-medium text-slate-300 mb-2">Rules</span>
+                <fieldset className="flex flex-col gap-2" role="radiogroup" aria-labelledby="rules-label">
+                  <label id="rules-label" className="sr-only">Eligibility rule</label>
+                  <label className="flex items-center gap-2 cursor-pointer text-slate-300">
+                    <input
+                      type="radio"
+                      name="rules"
+                      value="rule1"
+                      checked={ruleSelection === 'rule1'}
+                      onChange={() => handleRuleChange('rule1')}
+                      className="w-4 h-4 text-emerald-600 bg-slate-700 border-slate-600 focus:ring-emerald-500"
+                    />
+                    Four week rule (4+ games in selected team or lower sides)
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer text-slate-300">
+                    <input
+                      type="radio"
+                      name="rules"
+                      value="rule2"
+                      checked={ruleSelection === 'rule2'}
+                      onChange={() => handleRuleChange('rule2')}
+                      className="w-4 h-4 text-emerald-600 bg-slate-700 border-slate-600 focus:ring-emerald-500"
+                    />
+                    51% rule
+                  </label>
+                </fieldset>
               </div>
               <button
                 type="button"
@@ -280,23 +398,50 @@ export default function Eligibility() {
                     Eligible players for {team} ({eligible.length})
                   </h2>
                   {eligible.length > 0 && (
-                    <select
-                      value={sortBy}
-                      onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
-                      className={`${selectClass} w-auto min-w-40`}
-                    >
-                      <option value="name-asc">Name A–Z</option>
-                      <option value="name-desc">Name Z–A</option>
-                      <option value="games-asc">Games Low–High</option>
-                      <option value="games-desc">Games High–Low</option>
-                    </select>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-medium text-slate-300">Download</span>
+                        <select
+                          defaultValue=""
+                          onChange={(e) => {
+                            const value = e.target.value as '' | 'txt' | 'pdf' | 'csv'
+                            if (!value) return
+                            handleDownloadEligiblePlayers(value)
+                            e.target.value = ''
+                          }}
+                          className={`${compactSelectClass} w-auto min-w-28`}
+                        >
+                          <option value="">Choose format</option>
+                          <option value="txt">Text</option>
+                          <option value="pdf">PDF</option>
+                          <option value="csv">CSV</option>
+                        </select>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-medium text-slate-300">Sort</span>
+                      <select
+                        value={sortBy}
+                        onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
+                        className={`${compactSelectClass} w-auto min-w-28`}
+                      >
+                        <option value="name-asc">Name A–Z</option>
+                        <option value="name-desc">Name Z–A</option>
+                        <option value="games-asc">Games Low–High</option>
+                        <option value="games-desc">Games High–Low</option>
+                      </select>
+                      </div>
+                    </div>
                   )}
                 </div>
+                {showMultiClubWarnings && (
+                  <div className="mb-3 px-3 py-2 rounded-lg bg-amber-500/20 border border-amber-500/50 text-amber-200 text-sm">
+                    {multiClubInThisClub.length} player{multiClubInThisClub.length !== 1 ? 's' : ''} in this club have also played for other clubs. Check eligibility rules for multi-club players.
+                  </div>
+                )}
                 {eligible.length === 0 ? (
                   <p className="text-slate-400">
                     {ruleSelection === 'rule1' && 'No eligible players (4+ games in selected team or lower sides required).'}
                     {ruleSelection === 'rule2' && 'No eligible players (fewer than 51% of games in higher teams required).'}
-                    {ruleSelection === 'both' && 'No eligible players (both rules: 4+ games in selected team or lower sides, and fewer than 51% in higher teams).'}
                   </p>
                 ) : selectedPlayer ? (
                   <div className="space-y-4">
@@ -348,14 +493,27 @@ export default function Eligibility() {
                           key={`${p.surname}-${p.name}`}
                           className="flex justify-between items-baseline py-2 border-b border-slate-700 last:border-0"
                         >
-                          <button
-                            type="button"
-                            onClick={() => setSelectedPlayer(p)}
-                            className="font-medium text-left hover:underline decoration-slate-500 underline-offset-4"
-                          >
-                            {p.name} {p.surname}
-                          </button>
-                          <span className={`text-sm ${gamesColorClass}`}>{p.totalClubMatches} games</span>
+                          <div className="min-w-0 flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => setSelectedPlayer(p)}
+                              className="font-medium text-left hover:underline decoration-slate-500 underline-offset-4"
+                            >
+                              {p.name} {p.surname}
+                            </button>
+                            {multiClubKeySet.has(`${p.surname}|${p.name}`) && (
+                              <span
+                                className="shrink-0 inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs bg-amber-500/20 text-amber-300 border border-amber-500/50"
+                                title="Also played for other club(s)"
+                              >
+                                <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
+                                  <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                                </svg>
+                                Other club(s)
+                              </span>
+                            )}
+                          </div>
+                          <span className={`text-sm shrink-0 ${gamesColorClass}`}>{p.totalClubMatches} games</span>
                         </li>
                       )
                     })}
@@ -367,7 +525,20 @@ export default function Eligibility() {
         )}
         </div>
         <aside className="w-72 shrink-0 self-start mt-12">
-          <div className="bg-slate-800/80 border border-slate-600 rounded-xl p-4 sticky top-4">
+          <div className="bg-slate-800/80 border border-slate-600 rounded-xl p-4">
+            <p className="text-sm text-slate-300 leading-relaxed mb-2">
+              Try Bowlscore — a single app for training (AI analytics), drills and scoring games.
+            </p>
+            <a
+              href="https://bowlscore.com.au"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-emerald-400 hover:text-emerald-300 underline font-medium"
+            >
+              bowlscore.com.au
+            </a>
+          </div>
+          <div className="bg-slate-800/80 border border-slate-600 rounded-xl p-4 mt-4">
             <p className="text-sm text-slate-300 leading-relaxed">
               This tool is an indicator only and any results that look suspicious should be checked manually using the Bowls Victoria Spreadsheet.
             </p>
@@ -377,6 +548,9 @@ export default function Eligibility() {
 
       <footer className="fixed bottom-0 left-0 right-0 border-t border-slate-700 px-4 py-3 text-center text-slate-400 text-sm bg-slate-900 flex flex-wrap items-center justify-center gap-x-4 gap-y-1">
         <span>© This tool is copyright to Andrew Sleight 2026</span>
+        <Link to="/terms" className="text-emerald-400 hover:text-emerald-300 underline">
+          Terms &amp; Privacy
+        </Link>
         <button
           type="button"
           onClick={() => setFeedbackOpen(true)}
@@ -405,17 +579,24 @@ export default function Eligibility() {
               The CSV must have columns: <strong>Surname</strong>, <strong>Name</strong>, <strong>Nominated Club</strong>, <strong>Team</strong>, and <strong>Total Rounds Played</strong>. The app aggregates rows by player (surname + name), club, and team, so multiple rows for the same player at the same club and team are summed.
             </p>
             <p className="mb-2 text-slate-300 text-sm">
-              If the spreadsheet has columns F–R (the 6th–18th columns), any cell that contains <strong>(f)</strong> is treated as a finals round. For every occurrence of <strong>(f)</strong> in those columns, 1 is subtracted from that row’s contribution to the total. Finals rounds are not used when calculating eligibility.
+              Finals rounds are not counted toward eligibility calculations.
             </p>
           </section>
           <section>
             <h3 className="font-semibold text-white mb-2">Obtaining the CSV file</h3>
             <p className="mb-2 text-slate-300 text-sm">
-              Go to the{' '}
-              <a href="https://results.bowlslink.com.au/event/888793b6-ee24-48f8-9eac-3895cea9f7f8" target="_blank" rel="noopener noreferrer" className="text-emerald-400 hover:text-emerald-300 underline">
-                Bowls Victoria results portal
+              Go to:
+            </p>
+            <div className="flex flex-col gap-3 mb-2">
+              <a href="https://results.bowlslink.com.au/event/888793b6-ee24-48f8-9eac-3895cea9f7f8" target="_blank" rel="noopener noreferrer" className="text-emerald-400 hover:text-emerald-300 underline py-3 px-2 -mx-2 rounded-lg hover:bg-slate-700/50 active:bg-slate-700 min-h-[44px] flex items-center w-fit">
+                Bowls Victoria Weekend results portal
               </a>
-              . In the grey title box, click <strong>Event Info</strong>. Download the file &quot;Rounds played per member, per competition * (download CSV file)&quot;.
+              <a href="https://results.bowlslink.com.au/event/acf7179a-2367-4254-86fc-8e87e2888534" target="_blank" rel="noopener noreferrer" className="text-emerald-400 hover:text-emerald-300 underline py-3 px-2 -mx-2 rounded-lg hover:bg-slate-700/50 active:bg-slate-700 min-h-[44px] flex items-center w-fit">
+                Bowls Victoria Midweek results portal
+              </a>
+            </div>
+            <p className="mb-2 text-slate-300 text-sm">
+              In the grey title box, click <strong>Event Info</strong>. Download the file &quot;Rounds played per member, per competition * (download CSV file)&quot;.
             </p>
           </section>
           <section>
@@ -427,7 +608,7 @@ export default function Eligibility() {
           <section>
             <h3 className="font-semibold text-white mb-2">Running a check</h3>
             <p className="mb-2 text-slate-300 text-sm">
-              Select <strong>Nominated club</strong>, then <strong>Team</strong>, then which <strong>Rules</strong> to apply. Click <strong>Check eligibility</strong>. The list of eligible players appears with each player’s total club games. The total is colour-coded: <span className="text-red-400">red</span> = more games in higher sides than lower, <span className="text-emerald-400">green</span> = more in lower sides, grey = equal split.
+              Select <strong>Nominated club</strong>, then <strong>Team</strong>, then which <strong>Rules</strong> to apply. Click <strong>Check eligibility</strong>. The list of eligible players appears with each player’s total club games. The total is colour-coded: <span className="text-red-400">red</span> = some games in higher sides (brought down), <span className="text-emerald-400">green</span> = some games in lower sides (brought up), grey = equal split.
             </p>
           </section>
           <section>
@@ -443,12 +624,18 @@ export default function Eligibility() {
             </p>
           </section>
           <section>
+            <h3 className="font-semibold text-white mb-2">Multi-club player warnings</h3>
+            <p className="mb-2 text-slate-300 text-sm">
+              If the club you are analysing has players who appear for more than one Nominated Club in the CSV, a warning banner appears above the results and each such player is marked with an <strong>Other club(s)</strong> badge. Eligibility is calculated using only games at the nominated club; check the rules for multi-club players manually if needed.
+            </p>
+          </section>
+          <section>
             <h3 className="font-semibold text-white mb-2">Eligibility rules</h3>
             <p className="mb-2 text-slate-300 text-sm">
               <strong>Rule 1 (Four week rule)</strong>: The player must have at least 4 games in the selected team or lower-grade sides for that club (e.g. for Premier 2, count Premier 2, Premier 3, etc.).
             </p>
             <p className="mb-2 text-slate-300 text-sm">
-              <strong>Rule 2 (51% rule)</strong>: Fewer than 51% of the player’s club games must have been in teams higher than the selected team (e.g. Premier 1 is higher than Premier 2). You can apply Rule 1 only, Rule 2 only, or <strong>Both rules</strong>.
+              <strong>Rule 2 (51% rule)</strong>: Fewer than 51% of the player’s club games must have been in teams higher than the selected team (e.g. Premier 1 is higher than Premier 2). You can apply the Four week rule or the 51% rule.
             </p>
           </section>
           <section>

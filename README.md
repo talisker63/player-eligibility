@@ -9,7 +9,7 @@ A web application for checking Bowls Victoria player eligibility based on rounds
 - Parse Bowls Victoria rounds data format
 - Filter eligible players by club, team, and eligibility rules
 - View games per division for any eligible player (click name, then X to return)
-- Exclude finals rounds (cells marked "(f)" in columns F–R) from eligibility totals
+- Exclude finals rounds from eligibility totals
 - Password reset and show/hide password on login
 - Help modal accessible via header icon
 - Feedback form sending emails via Resend (andrew@asleight.com → asleighty@gmail.com)
@@ -100,7 +100,7 @@ The app expects a CSV with these columns (from Bowls Victoria results portal):
 
 - Surname, Name, Nominated Club, Team, Total Rounds Played
 
-If the file includes columns F–R (e.g. round-by-round data), any cell containing **(f)** is treated as a finals round and excluded from the player’s total for eligibility.
+If the file includes finals markers (for example **(f)**), those finals rounds are excluded from the player total for eligibility.
 
 ## Deployment
 
