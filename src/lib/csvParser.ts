@@ -2,6 +2,7 @@ import Papa from 'papaparse'
 import type { CsvRow, ParsedData, PlayerAtClub, TeamGrade } from '../types/eligibility'
 
 const REQUIRED_COLUMNS = ['Surname', 'Name', 'Nominated Club', 'Team', 'Total Rounds Played']
+const MAX_HOME_AND_AWAY_ROUNDS = 14
 
 function extractGrade(team: string): number {
   const match = team.trim().match(/(\d+)$/)
@@ -9,15 +10,23 @@ function extractGrade(team: string): number {
 }
 
 function isIncludedCompetitionColumn(header: string): boolean {
-  return !/[67]-A-Side/i.test(header)
+  return !/[67]-A-Side/i.test(header) && !/finals/i.test(header)
 }
 
 function countFinalsInColumns(raw: Record<string, string>, headers: string[]): number {
   let count = 0
   for (const col of headers) {
     const val = raw[col]?.trim() ?? ''
-    const matches = val.match(/\(f\)/g)
-    if (matches) count += matches.length
+    const roundsText = val.split(/\s-\s/)[0] ?? ''
+    const rounds = roundsText.split(',').map((round) => round.trim()).filter(Boolean)
+    for (const round of rounds) {
+      if (/\(\s*[a-z0-9]*f[a-z0-9]*\s*\)/i.test(round)) {
+        count += 1
+        continue
+      }
+      const numericRound = round.match(/^(\d+)$/)
+      if (numericRound && parseInt(numericRound[1], 10) > MAX_HOME_AND_AWAY_ROUNDS) count += 1
+    }
   }
   return count
 }
@@ -37,17 +46,18 @@ function hasAnyCompetitionData(raw: Record<string, string>, headers: string[]): 
   return headers.some((col) => (raw[col]?.trim() ?? '') !== '')
 }
 
+function getCompetitionColumns(headers: string[]): string[] {
+  return headers.filter((header) => !REQUIRED_COLUMNS.includes(header))
+}
+
 function normaliseRow(raw: Record<string, string>, headers: string[]): CsvRow | null {
   const total = raw['Total Rounds Played']?.trim()
   const num = total ? parseInt(total, 10) : NaN
-  const competitionColumns = headers.slice(5, 18)
+  const competitionColumns = getCompetitionColumns(headers)
   const includedCompetitionColumns = competitionColumns.filter(isIncludedCompetitionColumn)
-  const hasCompetitionColumns = competitionColumns.length > 0
-  const hasCompetitionDataInRow = hasAnyCompetitionData(raw, competitionColumns)
+  const hasAnyCompetitionDataInRow = hasAnyCompetitionData(raw, competitionColumns)
   const roundsFromIncludedColumns = countRoundsFromColumns(raw, includedCompetitionColumns)
-  const baseTotal = hasCompetitionColumns && hasCompetitionDataInRow
-    ? roundsFromIncludedColumns
-    : num
+  const baseTotal = hasAnyCompetitionDataInRow ? roundsFromIncludedColumns : num
   if (Number.isNaN(baseTotal) || baseTotal < 0) return null
   const finalsCount = countFinalsInColumns(raw, includedCompetitionColumns)
   const effectiveTotal = Math.max(0, baseTotal - finalsCount)

@@ -12,6 +12,7 @@ Player Eligibility is a React SPA that parses Bowls Victoria rounds CSV data and
 4. User selects Nominated Club and Team
 5. `getEligiblePlayers()` filters by: min 4 club games, < 51% games in higher teams
 6. Results are rendered in the UI; user can click a player to see games per division (from `matchesByTeam`), then close with X
+7. If the club being analysed has any players who appear for multiple clubs in the CSV, a warning banner is shown and each such player is marked with an "Other club(s)" badge
 
 ## Eligibility Rules
 
@@ -34,8 +35,9 @@ Firebase SDK init. Uses env vars for config.
 ### `lib/csvParser.ts`
 
 - `parseCsv(csvText)` – parses CSV, validates required columns, aggregates rows by player/club/team, and excludes finals rounds marked "(f)" from totals
+- Detects players who appear with more than one Nominated Club and exposes them in `playerKeysInMultipleClubs`
 - Required columns: Surname, Name, Nominated Club, Team, Total Rounds Played (competition columns are optional)
-- Returns `ParsedData`: clubs, teamsByClub, playersByClub
+- Returns `ParsedData`: clubs, teamsByClub, playersByClub, playerKeysInMultipleClubs
 
 ### `lib/eligibility.ts`
 
@@ -44,7 +46,7 @@ Firebase SDK init. Uses env vars for config.
 
 ### `types/eligibility.ts`
 
-Type definitions for CsvRow, TeamGrade, PlayerAtClub, EligiblePlayer, ParsedData.
+Type definitions for CsvRow, TeamGrade, PlayerAtClub, EligiblePlayer, ParsedData. ParsedData includes `playerKeysInMultipleClubs` (player keys who have rows for more than one Nominated Club).
 
 ## Routing
 

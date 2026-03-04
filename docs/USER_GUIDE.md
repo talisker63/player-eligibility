@@ -32,6 +32,10 @@
 4. Click **Check eligibility**.
 5. The list of eligible players appears below, with their total club games shown. Game counts are colour-coded: **red** indicates the player has played some games in higher sides (brought down); **green** indicates some games in lower sides (brought up); grey indicates an equal split.
 
+## Multi-club player warnings
+
+When the club you are analysing has players who appear for more than one Nominated Club in the CSV, the app shows a warning banner above the results and marks each such player with an **Other club(s)** badge. Eligibility is calculated using only games at the nominated club; the warning prompts you to check the rules for multi-club players manually.
+
 ## Viewing player details
 
 - Click a player’s **name** in the eligible list to see how many games that player has played in each division/grade (team) for the nominated club.

@@ -1,4 +1,5 @@
 import { signOut } from 'firebase/auth'
+import { jsPDF } from 'jspdf'
 import { useCallback, useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { auth, functions, httpsCallable } from '../lib/firebase'
@@ -12,6 +13,8 @@ import type { EligiblePlayer, ParsedData, TeamGrade } from '../types/eligibility
 
 const selectClass =
   'w-full px-4 py-3 rounded-lg bg-slate-700 border border-slate-600 text-white focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent disabled:opacity-60'
+const compactSelectClass =
+  'px-2.5 py-1.5 rounded-md bg-slate-700 border border-slate-600 text-slate-100 text-xs leading-5 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent disabled:opacity-60'
 
 export default function Eligibility() {
   const navigate = useNavigate()
@@ -105,6 +108,81 @@ export default function Eligibility() {
     logEvent('eligibility_check', { rule: ruleSelection })
     setEligible(getEligiblePlayers(data, club, team, ruleSelection))
     setSelectedPlayer(null)
+  }
+
+  function handleDownloadEligiblePlayers(format: 'txt' | 'pdf' | 'csv') {
+    if (!club || !team || sortedEligible.length === 0) return
+    const title = `Club: ${club} | Team: ${team} | Total players: ${sortedEligible.length}`
+    const safeClub = club.replace(/[^a-z0-9]+/gi, '-').replace(/^-+|-+$/g, '').toLowerCase()
+    const escapeCsvField = (value: string | number) => `"${String(value).replace(/"/g, '""')}"`
+    const safeTeam = team.replace(/[^a-z0-9]+/gi, '-').replace(/^-+|-+$/g, '').toLowerCase()
+    const stamp = new Date().toISOString().slice(0, 10)
+    const filePrefix = `eligible-players-${safeClub || 'club'}-${safeTeam || 'team'}-${stamp}`
+    const createDownload = (blob: Blob, filename: string) => {
+      const downloadUrl = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = downloadUrl
+      link.download = filename
+      link.click()
+      URL.revokeObjectURL(downloadUrl)
+    }
+
+    if (format === 'csv') {
+      const rows = sortedEligible.map((player) =>
+        [
+          player.surname,
+          player.name,
+          player.totalClubMatches,
+          player.matchesByTeam[team] ?? 0,
+        ]
+          .map(escapeCsvField)
+          .join(',')
+      )
+      const csvContent = [
+        escapeCsvField(title),
+        'Surname,Name,Total Club Games,Games In Selected Team',
+        ...rows,
+      ].join('\n')
+      createDownload(new Blob([csvContent], { type: 'text/csv;charset=utf-8;' }), `${filePrefix}.csv`)
+    } else if (format === 'txt') {
+      const lines = sortedEligible.map(
+        (player, index) =>
+          `${index + 1}. ${player.name} ${player.surname} | Total Club Games: ${player.totalClubMatches} | Games In ${team}: ${player.matchesByTeam[team] ?? 0}`
+      )
+      const txtContent = [title, '', ...lines].join('\n')
+      createDownload(new Blob([txtContent], { type: 'text/plain;charset=utf-8;' }), `${filePrefix}.txt`)
+    } else {
+      const doc = new jsPDF()
+      const pageHeight = doc.internal.pageSize.getHeight()
+      let y = 16
+      doc.setFontSize(12)
+      const titleLines = doc.splitTextToSize(title, 180)
+      for (const line of titleLines) {
+        if (y > pageHeight - 10) {
+          doc.addPage()
+          y = 16
+        }
+        doc.text(line, 14, y)
+        y += 6
+      }
+      y += 2
+      doc.setFontSize(10)
+      for (let i = 0; i < sortedEligible.length; i += 1) {
+        const player = sortedEligible[i]
+        const line = `${i + 1}. ${player.name} ${player.surname} | Total: ${player.totalClubMatches} | In ${team}: ${player.matchesByTeam[team] ?? 0}`
+        const wrapped = doc.splitTextToSize(line, 180)
+        for (const part of wrapped) {
+          if (y > pageHeight - 10) {
+            doc.addPage()
+            y = 16
+          }
+          doc.text(part, 14, y)
+          y += 5
+        }
+      }
+      doc.save(`${filePrefix}.pdf`)
+    }
+    logEvent('eligible_players_downloaded', { team, club, format })
   }
 
   async function handleSignOut() {
@@ -320,16 +398,39 @@ export default function Eligibility() {
                     Eligible players for {team} ({eligible.length})
                   </h2>
                   {eligible.length > 0 && (
-                    <select
-                      value={sortBy}
-                      onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
-                      className={`${selectClass} w-auto min-w-40`}
-                    >
-                      <option value="name-asc">Name A–Z</option>
-                      <option value="name-desc">Name Z–A</option>
-                      <option value="games-asc">Games Low–High</option>
-                      <option value="games-desc">Games High–Low</option>
-                    </select>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-medium text-slate-300">Download</span>
+                        <select
+                          defaultValue=""
+                          onChange={(e) => {
+                            const value = e.target.value as '' | 'txt' | 'pdf' | 'csv'
+                            if (!value) return
+                            handleDownloadEligiblePlayers(value)
+                            e.target.value = ''
+                          }}
+                          className={`${compactSelectClass} w-auto min-w-28`}
+                        >
+                          <option value="">Choose format</option>
+                          <option value="txt">Text</option>
+                          <option value="pdf">PDF</option>
+                          <option value="csv">CSV</option>
+                        </select>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-medium text-slate-300">Sort</span>
+                      <select
+                        value={sortBy}
+                        onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
+                        className={`${compactSelectClass} w-auto min-w-28`}
+                      >
+                        <option value="name-asc">Name A–Z</option>
+                        <option value="name-desc">Name Z–A</option>
+                        <option value="games-asc">Games Low–High</option>
+                        <option value="games-desc">Games High–Low</option>
+                      </select>
+                      </div>
+                    </div>
                   )}
                 </div>
                 {showMultiClubWarnings && (
@@ -520,6 +621,12 @@ export default function Eligibility() {
             <h3 className="font-semibold text-white mb-2">Viewing games per division</h3>
             <p className="mb-2 text-slate-300 text-sm">
               Click a player’s <strong>name</strong> in the eligible list to see how many games that player has played in each division/grade (team) for the nominated club. Click the <strong>X</strong> button to close the detail view and return to the list.
+            </p>
+          </section>
+          <section>
+            <h3 className="font-semibold text-white mb-2">Multi-club player warnings</h3>
+            <p className="mb-2 text-slate-300 text-sm">
+              If the club you are analysing has players who appear for more than one Nominated Club in the CSV, a warning banner appears above the results and each such player is marked with an <strong>Other club(s)</strong> badge. Eligibility is calculated using only games at the nominated club; check the rules for multi-club players manually if needed.
             </p>
           </section>
           <section>
