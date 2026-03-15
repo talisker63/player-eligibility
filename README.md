@@ -6,10 +6,12 @@ A web application for checking Bowls Victoria player eligibility based on rounds
 
 - Firebase Authentication (email/password and Google OAuth)
 - CSV upload and storage via Firebase Storage
-- Parse Bowls Victoria rounds data format
-- Filter eligible players by club, team, and eligibility rules
-- View games per division for any eligible player (click name, then X to return)
+- Parse Bowls Victoria rounds data format and extract division labels from headers
+- Filter eligible players by club, team, and eligibility rules (Four week rule or 51% rule)
+- View games per team with division labels (e.g. Ferntree Gully 3 - Div 4)
+- For multi-club players: breakdown of games per team at other clubs (highest to lowest)
 - Exclude finals rounds from eligibility totals
+- Download eligible list as Text, PDF, or CSV
 - Password reset and show/hide password on login
 - Help modal accessible via header icon
 - Feedback form sending emails via Resend (andrew@asleight.com → asleighty@gmail.com)

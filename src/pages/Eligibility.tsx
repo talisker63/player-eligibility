@@ -1,6 +1,6 @@
 import { signOut } from 'firebase/auth'
 import { jsPDF } from 'jspdf'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { auth, functions, httpsCallable } from '../lib/firebase'
 import { logEvent } from '../lib/analytics'
@@ -31,6 +31,7 @@ export default function Eligibility() {
   const [sortBy, setSortBy] = useState<'name-asc' | 'name-desc' | 'games-asc' | 'games-desc'>('name-asc')
   const [helpOpen, setHelpOpen] = useState(false)
   const [feedbackOpen, setFeedbackOpen] = useState(false)
+  const justClosedPlayerRef = useRef<EligiblePlayer | null>(null)
 
   const loadFromStorage = useCallback(async () => {
     setLoadLoading(true)
@@ -192,6 +193,7 @@ export default function Eligibility() {
 
   const teams: TeamGrade[] = (data && club ? data.teamsByClub[club] ?? [] : [])
   const canCheck = data && club && team
+  const selectedTeamDivision = teams.find((t) => t.team === team)?.division
 
   const multiClubInThisClub =
     data && club && eligible !== null
@@ -218,6 +220,17 @@ export default function Eligibility() {
     return list
   })()
 
+  useEffect(() => {
+    if (selectedPlayer === null && justClosedPlayerRef.current && sortedEligible.length > 0) {
+      const p = justClosedPlayerRef.current
+      const key = `${p.surname}|${p.name}`
+      justClosedPlayerRef.current = null
+      requestAnimationFrame(() => {
+        document.querySelector(`[data-player-key="${CSS.escape(key)}"]`)?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+      })
+    }
+  }, [selectedPlayer, sortedEligible.length])
+
   const selectedPlayerByTeam = selectedPlayer
     ? Object.entries(selectedPlayer.matchesByTeam)
       .filter(([, games]) => games > 0)
@@ -233,6 +246,38 @@ export default function Eligibility() {
         return a.teamName.localeCompare(b.teamName)
       })
     : []
+
+  const selectedPlayerOtherClubs =
+    selectedPlayer && data && club && (data.playerKeysInMultipleClubs ?? []).includes(`${selectedPlayer.surname}|${selectedPlayer.name}`)
+      ? data.clubs
+          .filter((c) => c !== club)
+          .flatMap((c) => {
+            const p = (data!.playersByClub[c] ?? []).find(
+              (x) => x.surname === selectedPlayer!.surname && x.name === selectedPlayer!.name
+            )
+            if (!p) return []
+            const teamsAtClub = data!.teamsByClub[c] ?? []
+            const teams = Object.entries(p.matchesByTeam)
+              .filter(([, games]) => games > 0)
+              .map(([teamName, games]) => {
+                const tg = teamsAtClub.find((t) => t.team === teamName)
+                return {
+                  teamName,
+                  division: tg?.division,
+                  games,
+                  grade: p.gradesByTeam[teamName] ?? extractGrade(teamName),
+                }
+              })
+              .sort((a, b) => {
+                const aGrade = a.grade > 0 ? a.grade : Number.POSITIVE_INFINITY
+                const bGrade = b.grade > 0 ? b.grade : Number.POSITIVE_INFINITY
+                if (aGrade !== bGrade) return aGrade - bGrade
+                return a.teamName.localeCompare(b.teamName)
+              })
+            if (teams.length === 0) return []
+            return [{ club: c, totalClubMatches: p.totalClubMatches, teams }]
+          })
+      : []
 
   return (
     <div className="min-h-screen bg-slate-900 text-white">
@@ -310,9 +355,14 @@ export default function Eligibility() {
           {uploadLoading && <p className="text-slate-400 text-sm mt-2">Uploading...</p>}
           {uploadError && <p className="text-red-400 text-sm mt-2">{uploadError}</p>}
           {data && (
-            <p className="text-slate-400 text-sm mt-2">
-              Loaded: {data.clubs.length} clubs. Upload a new file to replace.
-            </p>
+            <div className="flex items-end justify-between gap-2 mt-2">
+              <p className="text-slate-400 text-sm">
+                Loaded: {data.clubs.length} clubs. Upload a new file to replace.
+              </p>
+              {data.generatedAt && (
+                <p className="text-slate-500 text-xs text-right shrink-0">{data.generatedAt}</p>
+              )}
+            </div>
           )}
         </section>
 
@@ -349,7 +399,7 @@ export default function Eligibility() {
                 >
                   <option value="">Select team</option>
                   {teams.map((t) => (
-                    <option key={t.team} value={t.team}>{t.team}</option>
+                    <option key={t.team} value={t.team}>{t.division ? `${t.team} - ${t.division}` : t.team}</option>
                   ))}
                 </select>
               </div>
@@ -395,7 +445,7 @@ export default function Eligibility() {
               <section className="bg-slate-800 rounded-xl p-4">
                 <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
                   <h2 className="text-lg font-semibold">
-                    Eligible players for {team} ({eligible.length})
+                    Eligible players for {team}{selectedTeamDivision ? ` - ${selectedTeamDivision}` : ''} ({eligible.length})
                   </h2>
                   {eligible.length > 0 && (
                     <div className="flex flex-wrap items-center gap-2">
@@ -454,7 +504,10 @@ export default function Eligibility() {
                       </div>
                       <button
                         type="button"
-                        onClick={() => setSelectedPlayer(null)}
+                        onClick={() => {
+                          justClosedPlayerRef.current = selectedPlayer
+                          setSelectedPlayer(null)
+                        }}
                         className="p-2 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-300 hover:text-white transition-colors"
                         aria-label="Close player details"
                       >
@@ -469,14 +522,36 @@ export default function Eligibility() {
                         <span>Games</span>
                       </div>
                       <ul className="divide-y divide-slate-700">
-                        {selectedPlayerByTeam.map((row) => (
-                          <li key={row.teamName} className="flex justify-between gap-3 px-3 py-2">
-                            <span className="text-slate-200">{row.teamName}</span>
-                            <span className="text-slate-300 tabular-nums">{row.games}</span>
-                          </li>
-                        ))}
+                        {selectedPlayerByTeam.map((row) => {
+                          const div = data?.teamsByClub[club]?.find((t) => t.team === row.teamName)?.division
+                          return (
+                            <li key={row.teamName} className="flex justify-between gap-3 px-3 py-2">
+                              <span className="text-slate-200">{row.teamName}{div ? ` - ${div}` : ''}</span>
+                              <span className="text-slate-300 tabular-nums">{row.games}</span>
+                            </li>
+                          )
+                        })}
                       </ul>
                     </div>
+                    {selectedPlayerOtherClubs.length > 0 && (
+                      <div className="space-y-3">
+                        {selectedPlayerOtherClubs.map(({ club: otherClub, totalClubMatches, teams }) => (
+                          <div key={otherClub} className="border border-amber-500/50 rounded-lg overflow-hidden bg-amber-500/10">
+                            <div className="px-3 py-2 text-sm font-medium text-amber-100 border-b border-amber-500/50">
+                              {otherClub} — {totalClubMatches} games total
+                            </div>
+                            <ul className="divide-y divide-amber-500/30">
+                              {teams.map(({ teamName, division, games }) => (
+                                <li key={teamName} className="flex justify-between gap-3 px-3 py-2">
+                                  <span className="text-amber-100">{teamName}{division ? ` - ${division}` : ''}</span>
+                                  <span className="text-amber-100 tabular-nums">{games}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 ) : (
                   <ul className="space-y-2 max-h-96 overflow-y-auto">
@@ -491,6 +566,7 @@ export default function Eligibility() {
                       return (
                         <li
                           key={`${p.surname}-${p.name}`}
+                          data-player-key={`${p.surname}|${p.name}`}
                           className="flex justify-between items-baseline py-2 border-b border-slate-700 last:border-0"
                         >
                           <div className="min-w-0 flex items-center gap-2">
@@ -573,79 +649,78 @@ export default function Eligibility() {
       />
       <HelpModal open={helpOpen} onClose={() => setHelpOpen(false)} title="Help">
         <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-2">
+          <p className="text-slate-300 text-sm">
+            This tool helps you check which players are eligible to play for a selected team under Bowls Victoria rules. Use it to see who qualifies for the last three games or finals.
+          </p>
+
+          <section>
+            <h3 className="font-semibold text-white mb-2">1. What rules are being checked?</h3>
+            <p className="mb-2 text-slate-300 text-sm">
+              You can choose one of two rules. Both require players to have at least 4 club games.
+            </p>
+            <div className="space-y-3 text-slate-300 text-sm">
+              <div>
+                <strong className="text-white">Rule 1 (Four week rule):</strong> The player must have at least 4 games in the selected team or lower-grade sides (e.g. for Premier 2, count Premier 2, Premier 3, and lower).
+              </div>
+              <div>
+                <strong className="text-white">Rule 2 (51% rule):</strong> Fewer than 51% of the player’s club games must have been in higher teams (e.g. Division 3 is higher than Division 4).
+              </div>
+            </div>
+          </section>
+
+          <section>
+            <h3 className="font-semibold text-white mb-2">2. How to use the tool</h3>
+            <div className="space-y-4 text-slate-300 text-sm">
+              <div>
+                <strong className="text-white">Step 1 — Get the CSV</strong>
+                <p className="mt-1 mb-2">Go to the Bowls Victoria results portal (Weekend or Midweek). In the grey title box, click <strong>Event Info</strong> and download &quot;Rounds played per member, per competition * (download CSV file)&quot;.</p>
+                <div className="flex flex-col gap-2">
+                  <a href="https://results.bowlslink.com.au/event/888793b6-ee24-48f8-9eac-3895cea9f7f8" target="_blank" rel="noopener noreferrer" className="text-emerald-400 hover:text-emerald-300 underline w-fit">
+                    Weekend results portal
+                  </a>
+                  <a href="https://results.bowlslink.com.au/event/acf7179a-2367-4254-86fc-8e87e2888534" target="_blank" rel="noopener noreferrer" className="text-emerald-400 hover:text-emerald-300 underline w-fit">
+                    Midweek results portal
+                  </a>
+                </div>
+              </div>
+              <div>
+                <strong className="text-white">Step 2 — Upload the CSV</strong>
+                <p className="mt-1">In the <strong>Rounds CSV</strong> section, click <strong>Choose File</strong> and select your downloaded file. It is stored for all checks until you upload a new one.</p>
+              </div>
+              <div>
+                <strong className="text-white">Step 3 — Run a check</strong>
+                <p className="mt-1">Choose <strong>Nominated club</strong> and <strong>Team</strong>, pick a rule, then click <strong>Check eligibility</strong>. The list of eligible players appears below.</p>
+              </div>
+            </div>
+          </section>
+
+          <section>
+            <h3 className="font-semibold text-white mb-2">3. How the results work</h3>
+            <div className="space-y-3 text-slate-300 text-sm">
+              <p><strong className="text-white">Game count colours</strong> — Each player’s total club games is colour-coded: <span className="text-red-400">red</span> = some games in higher sides (brought down), <span className="text-emerald-400">green</span> = some games in lower sides (brought up), grey = equal split.</p>
+              <p><strong className="text-white">Sorting</strong> — Use the dropdown to sort by Name A–Z, Name Z–A, Games Low–High, or Games High–Low.</p>
+              <p><strong className="text-white">Player details</strong> — Click a player’s name to see games per team. Each team shows its division (e.g. Div 3) and games played. For players who have also played at other clubs, you’ll see a breakdown by team and games at each other club.</p>
+              <p><strong className="text-white">Multi-club players</strong> — If the club has players who appear for more than one Nominated Club, a warning banner and <strong>Other club(s)</strong> badges are shown. Eligibility uses only games at the nominated club; check multi-club rules separately if needed.</p>
+              <p><strong className="text-white">Download</strong> — Export the eligible list as Text, PDF, or CSV.</p>
+            </div>
+          </section>
+
           <section>
             <h3 className="font-semibold text-white mb-2">How the data is analysed</h3>
             <p className="mb-2 text-slate-300 text-sm">
-              The CSV must have columns: <strong>Surname</strong>, <strong>Name</strong>, <strong>Nominated Club</strong>, <strong>Team</strong>, and <strong>Total Rounds Played</strong>. The app aggregates rows by player (surname + name), club, and team, so multiple rows for the same player at the same club and team are summed.
-            </p>
-            <p className="mb-2 text-slate-300 text-sm">
-              Finals rounds are not counted toward eligibility calculations.
+              The app reads <strong>Surname</strong>, <strong>Name</strong>, <strong>Nominated Club</strong>, <strong>Team</strong>, and <strong>Total Rounds Played</strong> from the CSV. It aggregates rows by player, club, and team. Finals rounds are excluded from all eligibility calculations. Division labels (Premier, Premier Reserve, Div 1, Div 2, etc.) are read from the CSV headers.
             </p>
           </section>
-          <section>
-            <h3 className="font-semibold text-white mb-2">Obtaining the CSV file</h3>
-            <p className="mb-2 text-slate-300 text-sm">
-              Go to:
-            </p>
-            <div className="flex flex-col gap-3 mb-2">
-              <a href="https://results.bowlslink.com.au/event/888793b6-ee24-48f8-9eac-3895cea9f7f8" target="_blank" rel="noopener noreferrer" className="text-emerald-400 hover:text-emerald-300 underline py-3 px-2 -mx-2 rounded-lg hover:bg-slate-700/50 active:bg-slate-700 min-h-[44px] flex items-center w-fit">
-                Bowls Victoria Weekend results portal
-              </a>
-              <a href="https://results.bowlslink.com.au/event/acf7179a-2367-4254-86fc-8e87e2888534" target="_blank" rel="noopener noreferrer" className="text-emerald-400 hover:text-emerald-300 underline py-3 px-2 -mx-2 rounded-lg hover:bg-slate-700/50 active:bg-slate-700 min-h-[44px] flex items-center w-fit">
-                Bowls Victoria Midweek results portal
-              </a>
-            </div>
-            <p className="mb-2 text-slate-300 text-sm">
-              In the grey title box, click <strong>Event Info</strong>. Download the file &quot;Rounds played per member, per competition * (download CSV file)&quot;.
-            </p>
-          </section>
-          <section>
-            <h3 className="font-semibold text-white mb-2">Uploading the CSV</h3>
-            <p className="mb-2 text-slate-300 text-sm">
-              In the <strong>Rounds CSV</strong> section, click <strong>Choose File</strong> and select the downloaded CSV. The file is stored and used for all eligibility checks until you upload a new one.
-            </p>
-          </section>
-          <section>
-            <h3 className="font-semibold text-white mb-2">Running a check</h3>
-            <p className="mb-2 text-slate-300 text-sm">
-              Select <strong>Nominated club</strong>, then <strong>Team</strong>, then which <strong>Rules</strong> to apply. Click <strong>Check eligibility</strong>. The list of eligible players appears with each player’s total club games. The total is colour-coded: <span className="text-red-400">red</span> = some games in higher sides (brought down), <span className="text-emerald-400">green</span> = some games in lower sides (brought up), grey = equal split.
-            </p>
-          </section>
-          <section>
-            <h3 className="font-semibold text-white mb-2">Sorting the list</h3>
-            <p className="mb-2 text-slate-300 text-sm">
-              Use the dropdown above the list to sort by <strong>Name A–Z</strong>, <strong>Name Z–A</strong>, <strong>Games Low–High</strong>, or <strong>Games High–Low</strong>.
-            </p>
-          </section>
-          <section>
-            <h3 className="font-semibold text-white mb-2">Viewing games per division</h3>
-            <p className="mb-2 text-slate-300 text-sm">
-              Click a player’s <strong>name</strong> in the eligible list to see how many games that player has played in each division/grade (team) for the nominated club. Click the <strong>X</strong> button to close the detail view and return to the list.
-            </p>
-          </section>
-          <section>
-            <h3 className="font-semibold text-white mb-2">Multi-club player warnings</h3>
-            <p className="mb-2 text-slate-300 text-sm">
-              If the club you are analysing has players who appear for more than one Nominated Club in the CSV, a warning banner appears above the results and each such player is marked with an <strong>Other club(s)</strong> badge. Eligibility is calculated using only games at the nominated club; check the rules for multi-club players manually if needed.
-            </p>
-          </section>
-          <section>
-            <h3 className="font-semibold text-white mb-2">Eligibility rules</h3>
-            <p className="mb-2 text-slate-300 text-sm">
-              <strong>Rule 1 (Four week rule)</strong>: The player must have at least 4 games in the selected team or lower-grade sides for that club (e.g. for Premier 2, count Premier 2, Premier 3, etc.).
-            </p>
-            <p className="mb-2 text-slate-300 text-sm">
-              <strong>Rule 2 (51% rule)</strong>: Fewer than 51% of the player’s club games must have been in teams higher than the selected team (e.g. Premier 1 is higher than Premier 2). You can apply the Four week rule or the 51% rule.
-            </p>
-          </section>
+
           <section>
             <h3 className="font-semibold text-white mb-2">Feedback</h3>
-            <p className="mb-2 text-slate-300 text-sm">
-              Use the <strong>Feedback</strong> link in the footer to send a message to the tool owner.
+            <p className="text-slate-300 text-sm">
+              Use the <strong>Feedback</strong> link in the footer to contact the tool owner.
             </p>
           </section>
+
           <p className="text-amber-300 text-sm pt-2 border-t border-slate-600">
-            This tool is an indicator only. Any results that look suspicious should be checked manually using the Bowls Victoria Spreadsheet.
+            This tool is for guidance only. Please verify any eligibility decisions using the official Bowls Victoria spreadsheet.
           </p>
         </div>
       </HelpModal>

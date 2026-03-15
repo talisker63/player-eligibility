@@ -9,6 +9,7 @@ export interface CsvRow {
 export interface TeamGrade {
   team: string
   grade: number
+  division?: string
 }
 
 export interface PlayerAtClub {
@@ -31,4 +32,5 @@ export interface ParsedData {
   teamsByClub: Record<string, TeamGrade[]>
   playersByClub: Record<string, PlayerAtClub[]>
   playerKeysInMultipleClubs: string[]
+  generatedAt?: string
 }

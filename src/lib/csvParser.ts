@@ -50,6 +50,18 @@ function getCompetitionColumns(headers: string[]): string[] {
   return headers.filter((header) => !REQUIRED_COLUMNS.includes(header))
 }
 
+function isDivisionColumn(header: string): boolean {
+  return !/finals/i.test(header)
+}
+
+function extractDivisionFromHeader(header: string): string | undefined {
+  if (/Premier Reserve/i.test(header)) return 'Premier Reserve'
+  if (/\bPremier\b/i.test(header)) return 'Premier'
+  const m = header.match(/Division\s+(\d+)/i)
+  if (m) return `Div ${m[1]}`
+  return undefined
+}
+
 function normaliseRow(raw: Record<string, string>, headers: string[]): CsvRow | null {
   const total = raw['Total Rounds Played']?.trim()
   const num = total ? parseInt(total, 10) : NaN
@@ -76,15 +88,18 @@ export function parseCsv(csvText: string): { data: ParsedData; error?: string } 
   let headers = parsed.meta.fields ?? []
 
   const hasRequiredColumns = (candidateHeaders: string[]) => REQUIRED_COLUMNS.every((col) => candidateHeaders.includes(col))
+  let generatedAt: string | undefined
 
   if (!hasRequiredColumns(headers)) {
     const firstLineEnd = csvText.indexOf('\n')
+    const firstLine = firstLineEnd === -1 ? csvText.trim() : csvText.slice(0, firstLineEnd).trim()
     const textWithoutRow1 = firstLineEnd === -1 ? '' : csvText.slice(firstLineEnd + 1)
     const fallbackParsed = Papa.parse<Record<string, string>>(textWithoutRow1, parseOptions)
     const fallbackHeaders = fallbackParsed.meta.fields ?? []
     if (hasRequiredColumns(fallbackHeaders)) {
       parsed = fallbackParsed
       headers = fallbackHeaders
+      if (firstLine) generatedAt = firstLine
     }
   }
 
@@ -99,12 +114,26 @@ export function parseCsv(csvText: string): { data: ParsedData; error?: string } 
     }
   }
 
+  const competitionColumnsForDivision = getCompetitionColumns(headers).filter(isDivisionColumn)
+  const teamDivisionMap = new Map<string, string>()
+
   const aggregated = new Map<string, number>()
   for (const raw of parsed.data) {
     const row = normaliseRow(raw, headers)
     if (!row || !row.nominatedClub || !row.team) continue
     const key = `${row.surname}|${row.name}|${row.nominatedClub}|${row.team}`
     aggregated.set(key, (aggregated.get(key) ?? 0) + row.totalMatchesPlayed)
+    if (!teamDivisionMap.has(row.team)) {
+      for (const col of competitionColumnsForDivision) {
+        if ((raw[col]?.trim() ?? '') !== '') {
+          const div = extractDivisionFromHeader(col)
+          if (div) {
+            teamDivisionMap.set(row.team, div)
+            break
+          }
+        }
+      }
+    }
   }
 
   const clubsSet = new Set<string>()
@@ -151,7 +180,11 @@ export function parseCsv(csvText: string): { data: ParsedData; error?: string } 
   for (const club of clubs) {
     const teamMap = teamsByClub.get(club)
     resultTeamsByClub[club] = teamMap
-      ? Array.from(teamMap.entries()).map(([team, grade]) => ({ team, grade })).sort((a, b) => a.grade - b.grade)
+      ? Array.from(teamMap.entries()).map(([team, grade]) => ({
+          team,
+          grade,
+          division: teamDivisionMap.get(team),
+        })).sort((a, b) => a.grade - b.grade)
       : []
     const playerMap = playersByClub.get(club)
     resultPlayersByClub[club] = playerMap ? Array.from(playerMap.values()) : []
@@ -163,6 +196,7 @@ export function parseCsv(csvText: string): { data: ParsedData; error?: string } 
       teamsByClub: resultTeamsByClub,
       playersByClub: resultPlayersByClub,
       playerKeysInMultipleClubs,
+      generatedAt,
     },
   }
 }
