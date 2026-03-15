@@ -7,6 +7,7 @@ import { logEvent } from '../lib/analytics'
 import { downloadCsvFromStorage, uploadCsvToStorage } from '../lib/storage'
 import { parseCsv } from '../lib/csvParser'
 import { extractGrade, getEligiblePlayers, getGamesBias, type RuleSelection } from '../lib/eligibility'
+import BuyMeACoffee from '../components/BuyMeACoffee'
 import FeedbackModal from '../components/FeedbackModal'
 import HelpModal from '../components/HelpModal'
 import type { EligiblePlayer, ParsedData, TeamGrade } from '../types/eligibility'
@@ -622,11 +623,20 @@ export default function Eligibility() {
         </aside>
       </main>
 
+      <BuyMeACoffee />
       <footer className="fixed bottom-0 left-0 right-0 border-t border-slate-700 px-4 py-3 text-center text-slate-400 text-sm bg-slate-900 flex flex-wrap items-center justify-center gap-x-4 gap-y-1">
         <span>© This tool is copyright to Andrew Sleight 2026</span>
         <Link to="/terms" className="text-emerald-400 hover:text-emerald-300 underline">
           Terms &amp; Privacy
         </Link>
+        <a
+          href="https://buymeacoffee.com/asleighty"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-emerald-400 hover:text-emerald-300 underline"
+        >
+          Buy me a coffee
+        </a>
         <button
           type="button"
           onClick={() => setFeedbackOpen(true)}
@@ -717,6 +727,21 @@ export default function Eligibility() {
             <p className="text-slate-300 text-sm">
               Use the <strong>Feedback</strong> link in the footer to contact the tool owner.
             </p>
+          </section>
+
+          <section>
+            <h3 className="font-semibold text-white mb-2">Support</h3>
+            <p className="text-slate-300 text-sm mb-2">
+              If this tool has helped you, you can support it by buying me a coffee. Use the <strong>Buy me a coffee</strong> link in the footer or the floating button on the page.
+            </p>
+            <a
+              href="https://buymeacoffee.com/asleighty"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-emerald-400 hover:text-emerald-300 underline font-medium"
+            >
+              buymeacoffee.com/asleighty
+            </a>
           </section>
 
           <p className="text-amber-300 text-sm pt-2 border-t border-slate-600">
