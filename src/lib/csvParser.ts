@@ -51,7 +51,7 @@ function getCompetitionColumns(headers: string[]): string[] {
 }
 
 function isDivisionColumn(header: string): boolean {
-  return !/finals/i.test(header)
+  return !/finals/i.test(header) && !/7-a-side/i.test(header)
 }
 
 function extractDivisionFromHeader(header: string): string | undefined {
@@ -150,7 +150,7 @@ export function parseCsv(csvText: string): { data: ParsedData; error?: string } 
     if (!teamsByClub.has(nominatedClub)) teamsByClub.set(nominatedClub, new Map())
     const teamGrades = teamsByClub.get(nominatedClub)!
     const grade = extractGrade(team)
-    if (!teamGrades.has(team)) teamGrades.set(team, grade)
+    if (total > 0 && !teamGrades.has(team)) teamGrades.set(team, grade)
 
     if (!playersByClub.has(nominatedClub)) playersByClub.set(nominatedClub, new Map())
     const clubPlayers = playersByClub.get(nominatedClub)!
