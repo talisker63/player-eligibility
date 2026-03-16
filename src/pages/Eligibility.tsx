@@ -629,14 +629,6 @@ export default function Eligibility() {
         <Link to="/terms" className="text-emerald-400 hover:text-emerald-300 underline">
           Terms &amp; Privacy
         </Link>
-        <a
-          href="https://buymeacoffee.com/asleighty"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-emerald-400 hover:text-emerald-300 underline"
-        >
-          Buy me a coffee
-        </a>
         <button
           type="button"
           onClick={() => setFeedbackOpen(true)}
@@ -670,7 +662,7 @@ export default function Eligibility() {
             </p>
             <div className="space-y-3 text-slate-300 text-sm">
               <div>
-                <strong className="text-white">Rule 1 (Four week rule):</strong> The player must have at least 4 games in the selected team or lower-grade sides (e.g. for Premier 2, count Premier 2, Premier 3, and lower).
+                <strong className="text-white">Rule 1 (Four week rule):</strong> The player must have at least 4 games in the selected team or lower-grade sides (e.g. for Division 2, count Division 2, Division 3, and lower).
               </div>
               <div>
                 <strong className="text-white">Rule 2 (51% rule):</strong> Fewer than 51% of the player’s club games must have been in higher teams (e.g. Division 3 is higher than Division 4).
